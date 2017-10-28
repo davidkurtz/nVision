@@ -12,6 +12,7 @@ spool nvision_dynamic_selectors
 --Status Flag:
 --I: Inserted
 --D: Deleted
+--S: Static Select
 --X: Partition Dropped
 --------------------------------------------------------------------------------
 create table ps_nvs_treeslctlog
@@ -21,7 +22,7 @@ create table ps_nvs_treeslctlog
 ,num_rows           number not null
 ,timestamp          timestamp not null
 ,module             VARCHAR2(64 CHAR) not null
-,action             VARCHAR2(64 CHAR) not null
+,appinfo_action     VARCHAR2(64 CHAR) not null
 ,client_info        VARCHAR2(64 CHAR) not null
 ,status_flag        VARCHAR2(1 CHAR) not null
 ,tree_name          VARCHAR2(18 CHAR) default ' ' NOT NULL
@@ -50,6 +51,8 @@ alter table ps_nvs_treeslctlog modify ownerid not null;
 alter table ps_nvs_treeslctlog add job_no integer;
 update ps_nvs_treeslctlog set job_no = 0 where job_no is null;
 alter table ps_nvs_treeslctlog modify job_no not null;
+
+alter table ps_nvs_treeslctlog rename column action to appinfo_action;
 
 
 CREATE UNIQUE INDEX ps_nvs_treeslctlog ON ps_nvs_treeslctlog (selector_num) TABLESPACE psindex
@@ -105,8 +108,8 @@ pause
 --one-time fix to populate selector log with static selectors
 --------------------------------------------------------------------------------
 INSERT INTO ps_nvs_treeslctlog
-(selector_num, process_instance, length, num_rows, timestamp, module, action, client_info, status_flag, tree_name, ownerid, partition_name)
-SELECT DISTINCT selector_num, 0, length, 0, selector_dt, ' ', ' ', ' ', 'S', sys_context( 'userenv', 'current_schema' ), tree_name, ' '
+(selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, ownerid, tree_name, partition_name, job_no)
+SELECT DISTINCT selector_num, 0, length, 0, selector_dt, ' ', ' ', ' ', 'S', sys_context( 'userenv', 'current_schema' ), tree_name, ' ', 0
 FROM pstreeselctl c
 WHERE NOT EXISTS(SELECt 'x' FROM ps_nvs_treeslctlog l WHERE l.selector_Num = c.selector_num)
 /
@@ -127,7 +130,7 @@ BEGIN
     FROM   all_tables t
     WHERE  table_name LIKE 'PSTREESELECT__' 
   ) LOOP
-    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, action, client_info, status_flag, tree_name, ownerid, partition_name) SELECT DISTINCT s.selector_num, 0, '||i.length||', 0, SYSDATE, '' '', '' '', '' '', ''I'', '' '', '' '', '' '' 
+    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) SELECT DISTINCT s.selector_num, 0, '||i.length||', 0, SYSDATE, '' '', '' '', '' '', ''I'', '' '', '' '', '' '', 0 
 FROM '||i.owner||'.'||i.table_name||' s WHERE NOT EXISTS(SELECT 1 FROM ps_nvs_treeslctlog l WHERE l.selector_num = s.selector_num)';
     dbms_output.put_line(l_sql);
     EXECUTE IMMEDIATE l_sql;
@@ -158,7 +161,7 @@ BEGIN
   ) LOOP
     l_high_Value := i.high_Value;
     l_selector_Num := TO_NUMBER(l_high_value)-1;
-    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) 
+    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) 
               VALUES (:1, 0, :2, :3, :4, '' '', '' '', '' '', ''I'', '' '', :5, :6, 0 )';
     BEGIN
       EXECUTE IMMEDIATE l_sql USING l_selector_num, i.length, i.num_rows, i.created, i.table_owner, i.partition_name;
@@ -181,7 +184,7 @@ USING (
   ,      v$sql s
   where	 l.tree_name IS NULL
   and	 l.module = s.module
-  and	 l.action = s.action
+  and	 l.appinfo_action = s.action
   and    s.sql_text like 'INSERT%PSTREESELECT%SELECT%'
   and	 s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
   and    l.tree_name = ' '
@@ -204,7 +207,7 @@ USING (
   and    s.dbid = d.dbid
   and    s.sql_id = t.sql_id
   and	 t.module = l.module
-  and	 t.action = l.action
+  and	 t.action = l.appinfo_action
   and    s.sql_text like 'INSERT%PSTREESELECT%SELECT%'
   and	 s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
   and    l.tree_name = ' '
@@ -382,8 +385,9 @@ column process_instance heading 'Process|Instance'
 column tree_name   format a18
 column report_id   format a18
 column layout_id   format a18
-column module      format a12
-column action      format a26
+column module      format a12 heading 'Module'
+column action      format a26 heading 'Action'
+column appinfo_action  format a26 heading 'Action'
 column client_info format a50
 column selector_num format 999999 heading 'Selector|Number'
 column timestamp format a30
@@ -405,17 +409,17 @@ with u as (
 ), t as (
 select /*+MATERIALIZE*/ * from u
 ), l as (
-select	l.selector_num, l.process_instance, l.length, l.timestamp, l.module, l.action, l.client_info, l.status_flag, l.num_rows
+select	l.selector_num, l.process_instance, l.length, l.timestamp, l.module, l.appinfo_action, l.client_info, l.status_flag, l.num_rows
 ,	NVL(l.tree_name, 
 	        (SELECT t.tree_name
 		from	t
 		where 	t.module = l.module
-		and	t.action = l.action
+		and	t.action = l.appinfo_action
 		and     t.selector_num = l.selector_num
 		and	rownum=1)
 	) tree_name
-,	substr(regexp_substr(l.action,':([[:alnum:]])+',1,2),2) business_unit
-,	substr(regexp_substr(l.action,':([[:alnum:]])+',1,1),2) report_id
+,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,2),2) business_unit
+,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,1),2) report_id
 FROM	ps_nvs_treeslctlog l
 LEFT OUTER JOIN pstreeselctl s
 ON s.selector_num = l.selector_num
@@ -531,7 +535,7 @@ END;
 --------------------------------------------------------------------------------
 --remove erroneous static selectors
 --------------------------------------------------------------------------------
-set serveroutpt on 
+set serveroutput on 
 BEGIN
   FOR i IN (
 select	c.*
