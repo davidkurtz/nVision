@@ -28,6 +28,7 @@ PROCEDURE rowins
 PROCEDURE rowdel
 (p_selector_num     INTEGER 
 );
+PROCEDURE reset_selector_num;
 --exposed for testing only
 --PROCEDURE gather_selector_stats
 --(p_length INTEGER
@@ -46,7 +47,7 @@ CREATE OR REPLACE PACKAGE BODY sysadm.xx_nvision_selectors AS
 --------------------------------------------------------------------------------------------------------------
 --Constants that should not be changed
 --------------------------------------------------------------------------------------------------------------
-k_module           CONSTANT VARCHAR2(48 CHAR) := $$PLSQL_UNIT; --name of package for instrumentation
+k_module           CONSTANT VARCHAR2(64 CHAR) := $$PLSQL_UNIT; --name of package for instrumentation
 k_dfps             CONSTANT VARCHAR2(20 CHAR) := 'YYYYMMDDHH24MISS'; --date format picture string
 k_dfpsh            CONSTANT VARCHAR2(30 CHAR) := 'HH24:MI:SS DD.MM.YYYY'; --date format picture string for humans
 k_purge_days       CONSTANT INTEGER := 31; --number of days after which to purge selector log
@@ -55,15 +56,15 @@ k_stats_gather_job CONSTANT BOOLEAN := TRUE; --true to always submit stats gathe
 -------------------------------------------------------------------------------------------------------
 --package global variables
 -------------------------------------------------------------------------------------------------------
-l_debug_level  INTEGER := 8;  -- variable to hold debug level of package
-l_debug_indent INTEGER := 0; -- indent level of procedure
+l_debug_level    INTEGER := 8;  -- variable to hold debug level of package
+l_debug_indent   INTEGER := 0; -- indent level of procedure
 -------------------------------------------------------------------------------------------------------
-g_selector_num INTEGER :=0;
-g_counter INTEGER :=0;
-g_range_from_min VARCHAR2(30);
-g_range_from_max VARCHAR2(30);
-g_range_to_min VARCHAR2(30);
-g_range_to_max VARCHAR2(30);
+g_selector_num   INTEGER :=0;
+g_counter        INTEGER :=0;
+g_range_from_min VARCHAR2(30 CHAR);
+g_range_from_max VARCHAR2(30 CHAR);
+g_range_to_min   VARCHAR2(30 CHAR);
+g_range_to_max   VARCHAR2(30 CHAR);
 
 -------------------------------------------------------------------------------------------------------
 -- to optionally print debug text during package run time
@@ -105,12 +106,12 @@ END;
 PROCEDURE purge_selector
 (p_length         INTEGER
 ,p_selector_num   INTEGER 
-,p_ownerid       VARCHAR2
+,p_ownerid        VARCHAR2
 ,p_partition_name all_tab_partitions.partition_name%TYPE DEFAULT ''
 ) AS 
-  l_cmd            VARCHAR2(1000);
+  l_cmd            VARCHAR2(1000 CHAR);
   l_num_rows       INTEGER;
-  l_table_name     VARCHAR2(18 CHAR);
+  l_table_name     psrecdefn.sqltablename%TYPE;
   l_partition_name all_tab_partitions.partition_name%TYPE;
   l_job_no         INTEGER;
 
@@ -181,7 +182,12 @@ END purge_selector;
 PROCEDURE purge_selectors
 (p_process_instance INTEGER 
 ) AS 
+  l_module       VARCHAR2(64 CHAR);
+  l_action       VARCHAR2(64 CHAR);
 BEGIN
+  dbms_application_info.read_module(l_module, l_action);
+  dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'purge_selectors('||p_process_instance||')'));
+
   FOR i IN (
     SELECT *
     FROM   ps_nvs_treeslctlog l
@@ -191,6 +197,8 @@ BEGIN
   ) LOOP
     purge_selector(i.length, i.selector_num, i.ownerid, i.partition_name);
   END LOOP;
+
+  dbms_application_info.set_module(l_module, l_action);
 END purge_selectors;
 --------------------------------------------------------------------------------
 --update stats directly
@@ -198,7 +206,7 @@ END purge_selectors;
 --------------------------------------------------------------------------------
 PROCEDURE set_selector_stats
 (p_length         INTEGER
-,p_ownerid       VARCHAR2
+,p_ownerid        VARCHAR2
 ,p_partition_name VARCHAR2 DEFAULT NULL
 ,p_selector_num   INTEGER
 ,p_num_rows       INTEGER
@@ -206,7 +214,7 @@ PROCEDURE set_selector_stats
   PRAGMA AUTONOMOUS_TRANSACTION; 
   k_rowsperblock CONSTANT INTEGER := 160; --assumed rows per block to calculate number of blocks
   k_avgrowlen    CONSTANT INTEGER := 30;  --assumed average row length
-  l_table_name   VARCHAR2(18 CHAR);
+  l_table_name   psrecdefn.sqltablename%TYPE;
   l_srec         dbms_stats.statrec;
 
 BEGIN
@@ -302,13 +310,13 @@ END set_selector_stats;
 PROCEDURE gather_selector_stats
 (p_length       INTEGER
 ,p_selector_num INTEGER
-,p_ownerid     VARCHAR2
+,p_ownerid      VARCHAR2
 ,p_num_rows     INTEGER DEFAULT NULL
 ,p_status_flag  VARCHAR2 DEFAULT 'I'
 ) AS 
-  l_table_name     VARCHAR2(18 CHAR);
+  l_table_name     psrecdefn.sqltablename%TYPE;
   l_partition_name all_tab_partitions.partition_name%TYPE;
-  l_cmd            VARCHAR2(1000);
+  l_cmd            VARCHAR2(1000 CHAR);
   l_job_no         NUMBER;
 BEGIN
   debug_msg('gather_selector_stats('||p_length||','||p_selector_num||','||p_ownerid||','||p_num_rows||','||p_status_flag||')');
@@ -414,6 +422,7 @@ PROCEDURE purge
 BEGIN
   dbms_application_info.read_module(l_module, l_action);
   dbms_application_info.read_client_info(l_client_info);
+  dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'purge('||p_selector_num||')'));
 
   --add log entries for partitions where selector not logged
   FOR i IN (
@@ -435,19 +444,26 @@ BEGIN
     AND NOT EXISTS(
       SELECT 'x'
       FROM   ps_nvs_treeslctlog l
-      WHERE  l.length = TO_NUMBER(SUBSTR(x.table_name,-2))
+      WHERE  l.length = TO_NUMBER(x.length)
+      AND    l.ownerid = x.table_owner
       AND    l.partition_name = x.partition_name)
   ) LOOP
     l_selector_num := SUBSTR(i.high_value,1,i.high_value_length) - 1;
 
     BEGIN
       INSERT INTO ps_nvs_treeslctlog
-      (selector_num, process_instance, length, num_rows, timestamp, module, action, client_info, status_flag, tree_name, ownerid, partition_name, job_no)
+      (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no)
       VALUES
       (l_selector_num, 0, i.length, i.num_rows, i.timestamp, k_module, 'PURGE', NVL(l_client_info,' '), 'I', ' ', i.table_owner, i.partition_name, 0);
       debug_msg('Add log file entry for selector_num:'||l_selector_num||', partition '||i.partition_name);
-    EXCEPTION
-      WHEN dup_val_on_index THEN NULL;
+    EXCEPTION 
+      WHEN dup_val_on_index THEN
+        UPDATE ps_nvs_treeslctlog
+        SET    ownerid = i.table_owner
+        ,      partition_name = i.partition_name
+        ,      length = i.length
+        WHERE  selector_num = l_selector_num;
+        debug_msg('Update existing log entry for selector '||l_selector_Num||':'||i.table_owner||'.'||i.table_name||'.'||i.partition_name,8);
     END;
 
   END LOOP;
@@ -487,9 +503,56 @@ BEGIN
       COMMIT;
     END LOOP;
   END;
+
+  dbms_application_info.set_module(l_module, l_action);
   
 END purge;
 
+--------------------------------------------------------------------------------
+--reset selector num to 0, and clear out unlogged selectors
+--------------------------------------------------------------------------------
+PROCEDURE reset_selector_num AS
+  l_sql CLOB;
+  l_module       VARCHAR2(64 CHAR);
+  l_action       VARCHAR2(64 CHAR);
+BEGIN
+  dbms_application_info.read_module(l_module, l_action);
+  dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'reset_selector_num'));
+
+  UPDATE pstreeselnum SET selector_num = 0;
+
+  FOR i IN (
+    SELECT owner, table_name
+    FROM   all_tables
+    WHERE  table_name = 'PSTREESELCTL'
+  ) LOOP
+    l_sql := 'DELETE FROM '||i.owner||'.'||i.table_name;
+    EXECUTE IMMEDIATE l_sql;
+    debug_msg(TO_CHAR(SQL%ROWCOUNT)||' rows deleted from '||i.owner||'.'||i.table_name);
+  END LOOP;
+
+  UPDATE ps_nvs_treeslctlog
+  SET    status_flag = 'I'
+  WHERE  status_flag = 'S';
+
+  FOR i IN (
+    SELECT owner, table_name
+    ,      SUBSTR(table_name,-2) length
+    FROM   all_part_tables
+    WHERE  table_name LIKE 'PSTREESELECT__'
+  ) LOOP
+    l_sql := 'DELETE FROM '||i.owner||'.'||i.table_name
+          ||' WHERE NOT selector_num IN(SELECT selector_num FROM ps_nvs_treeslctlog l WHERE l.ownerid='''||i.owner||''' AND l.length='||i.length||' AND status_flag=''I'')';
+    debug_msg(l_sql,9);
+    EXECUTE IMMEDIATE l_sql;
+    debug_msg(TO_CHAR(SQL%ROWCOUNT)||' rows deleted from '||i.owner||'.'||i.table_name);
+  END LOOP;
+
+  COMMIT;
+  purge;
+  dbms_application_info.set_module(l_module, l_action);
+
+END reset_selector_num;
 --------------------------------------------------------------------------------
 --delete entry from log table
 --can assume all rows for a given selector deleted and only one selector deleted at a time
@@ -497,9 +560,19 @@ END purge;
 PROCEDURE logdel
 (p_length INTEGER
 ) AS 
+  l_process_instance INTEGER;
+  l_module           VARCHAR2(64 CHAR);
+  l_action           VARCHAR2(64 CHAR);
+  l_client_info      VARCHAR2(64 CHAR);
   l_length INTEGER;
 BEGIN
+  dbms_application_info.read_module(l_module, l_action);
+  dbms_application_info.read_client_info(l_client_info);
+
+  l_process_instance := psftapi.get_prcsinstance();
+
   debug_msg('logdel:selector_num='||g_selector_num);
+
   IF g_selector_num > 0 THEN
     UPDATE ps_nvs_treeslctlog
     SET    status_flag = 'D'
@@ -530,7 +603,7 @@ PROCEDURE logins
   l_static_tree_name ps_nvs_treeslctlog.tree_name%TYPE := ' ';
   l_selector_num     INTEGER := 0;
   l_partition_name   all_tab_partitions.partition_name%TYPE;
-  l_table_name       VARCHAR2(18 CHAR);
+  l_table_name       psrecdefn.sqltablename%TYPE;
   l_status_flag      ps_nvs_treeslctlog.status_flag%TYPE := 'I';
 BEGIN
   dbms_application_info.read_module(l_module, l_action);
@@ -539,7 +612,7 @@ BEGIN
   l_process_instance := psftapi.get_prcsinstance();
   l_table_name := 'PSTREESELECT'||LTRIM(TO_CHAR(p_length,'00'));
 
-  debug_msg('g_selector_num='||g_selector_num||' g_counter='||g_counter||',owner='||p_ownerid);
+  debug_msg('logins:selector_num='||g_selector_num||' counter='||g_counter||',owner='||p_ownerid);
 
   BEGIN --identify tree name to selector log
     debug_msg('INSERT INTO '||l_table_name||'%SELECT% '||g_selector_num||',%');
@@ -600,7 +673,7 @@ BEGIN
 
     BEGIN
       INSERT INTO ps_nvs_treeslctlog
-      (selector_num, process_instance, length, num_rows, timestamp, module, action, client_info
+      (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info
       , status_flag, tree_name, ownerid, partition_name, job_no)
       VALUES
       (g_selector_num, NVL(l_process_instance,0), p_length, g_counter, systimestamp, NVL(l_module,' '), NVL(l_action,' '), NVL(l_client_info,' ')
@@ -611,7 +684,7 @@ BEGIN
         SET    l.num_rows = CASE WHEN l.status_flag IN ('D','X') THEN 0 ELSE l.num_rows END + g_counter
         ,      l.status_flag = l_status_flag
         ,      l.module = NVL(l_module,l.module)
-        ,      l.action = NVL(l_action,l.action)
+        ,      l.appinfo_action = NVL(l_action,l.appinfo_action)
         ,      l.client_info = NVL(l_client_info,l.client_info)
         ,      l.tree_name = l_tree_name
         ,      l.ownerid = p_ownerid
