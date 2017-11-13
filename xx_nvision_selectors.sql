@@ -121,6 +121,7 @@ PROCEDURE purge_selector
   e_partition_does_not_exist EXCEPTION;
   PRAGMA EXCEPTION_INIT(e_partition_does_not_exist, -2149); --ORA-02149: Specified partition does not exist  
 
+  PRAGMA AUTONOMOUS_TRANSACTION; /*added 11.11.2017 for end of nVision purge*/
 BEGIN
   l_table_name := 'PSTREESELECT'||LTRIM(TO_CHAR(p_length,'00'));
 
@@ -131,7 +132,8 @@ BEGIN
   END IF;
 
   IF l_partition_name IS NULL THEN
-    l_cmd := 'DELETE FROM '||p_ownerid||'.'||l_table_name||' WHERE selector_num := 1'; 
+    l_cmd := 'DELETE FROM '||p_ownerid||'.'||l_table_name||' WHERE selector_num = :1'; 
+    debug_msg(l_cmd||','||p_selector_num);
     EXECUTE IMMEDIATE l_cmd USING p_selector_num;
   ELSE
     BEGIN
@@ -422,7 +424,12 @@ PROCEDURE purge
 BEGIN
   dbms_application_info.read_module(l_module, l_action);
   dbms_application_info.read_client_info(l_client_info);
-  dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'purge('||p_selector_num||')'));
+
+  IF p_selector_num IS NULL THEN
+    dbms_application_info.set_module(k_module, NVL(l_action,'purge'));
+  ELSE
+    dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'purge('||p_selector_num||')'));
+  END IF;
 
   --add log entries for partitions where selector not logged
   FOR i IN (
