@@ -77,6 +77,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN NULL; --exception deliberately coded to suppress all exceptions
 END;
 /
+show errors
 pause
 --------------------------------------------------------------------------------
 --mark/unmark static selectors
@@ -308,7 +309,29 @@ and    status_flag IN('I','D')
 /
 
 
-@@treeselector_trigger
+--------------------------------------------------------------------------------
+--one-time fix purge selectors
+--------------------------------------------------------------------------------
+set serveroutput on 
+BEGIN
+  FOR i IN (
+    SELECT DISTINCT process_instance
+    ,      length, ownerid, partition_name
+    FROM   ps_nvs_treeslctlog l
+    ,	   psprcsrqst r
+    WHERE  r.prcsinstance = l.process_instance
+    and	   r.runstatus IN('2','9')
+    and	   l.partition_name != ' '
+  ) LOOP
+    dbms_output.put_line('Purging PI:'||i.process_instance);
+    xx_nvision_selectors.purge_selectors(i.process_instance);
+  END LOOP;
+END;
+/
+
+
+
+@@treeselector_triggers
 
 
 /*-------------------------------------------------------------------------------------------------------------------------------------
