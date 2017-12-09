@@ -1,0 +1,323 @@
+REM new version with ownerid 
+
+create user nvexec01 identified by wibble42;
+create user nvexec02 identified by wibble42;
+create user nvexec03 identified by wibble42;
+create user nvexec04 identified by wibble42;
+create user nvexec05 identified by wibble42;
+create user nvexec06 identified by wibble42;
+create user nvexec07 identified by wibble42;
+create user nvexec08 identified by wibble42;
+create user nvexec09 identified by wibble42;
+create user nvexec10 identified by wibble42;
+create user nvexec11 identified by wibble42;
+create user nvexec12 identified by wibble42;
+create user nvexec13 identified by wibble42;
+create user nvexec14 identified by wibble42;
+create user nvexec15 identified by wibble42;
+create user nvexec16 identified by wibble42;
+
+ALTER USER sysadm   QUOTA UNLIMITED ON ptwork;
+ALTER USER sysadm   QUOTA UNLIMITED ON psindex;
+@@xx_nvision_selectors
+
+set serveroutput on
+DECLARE
+  l_sql CLOB;
+  e_name_already_used EXCEPTION;
+  PRAGMA exception_init(e_name_already_used,-955);
+BEGIN
+  FOR i IN (SELECT username FROM dba_users WHERE username LIKE 'NVEXEC__' ORDER BY username) LOOP
+    l_sql := 'grant connect, resource to '||i.username;
+    dbms_output.put_line(l_sql);
+    EXECUTE IMMEDIATE l_sql;
+
+    l_sql := 'ALTER USER '||i.username||' QUOTA UNLIMITED ON ptwork';
+    dbms_output.put_line(l_sql);
+    EXECUTE IMMEDIATE l_sql;
+
+    l_sql := 'ALTER USER '||i.username||' QUOTA UNLIMITED ON psindex';
+    dbms_output.put_line(l_sql);
+    EXECUTE IMMEDIATE l_sql;
+
+    BEGIN
+      l_sql := 'create synonym '||i.username||'.ps_nvs_treeslctlog for sysadm.ps_nvs_treeslctlog';
+      dbms_output.put_line(l_sql);
+      EXECUTE IMMEDIATE l_sql;
+    EXCEPTION
+      WHEN e_name_already_used THEN
+        dbms_output.put_line('Ignored Error '||sqlerrm);
+    END;
+
+    l_sql := 'grant select, insert, update on sysadm.ps_nvs_treeslctlog to '||i.username;
+    dbms_output.put_line(l_sql);
+    EXECUTE IMMEDIATE l_sql;
+
+    l_sql := 'grant execute on sysadm.xx_nvision_selectors TO '||i.username;
+    dbms_output.put_line(l_sql);
+    EXECUTE IMMEDIATE l_sql;
+  END LOOP;
+END;
+/
+
+
+REM generate grant script
+@@nvstables.sql
+@@nvsprivs
+
+alter session set current_schema=NVEXEC01;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC02;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC03
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC04;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC05;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC06;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC07
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC08;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC09;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC10;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC11;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC12;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC13;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC14;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC15;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+alter session set current_schema=NVEXEC16;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@pstreeselctl.sql
+@@pstreeselect_interval_partitioning.txt
+
+
+alter session set current_schema=SYSADM;
+select sys_context( 'userenv', 'current_schema' ) from dual; 
+@@treeselector_triggers
+@@treeselector_statprefs.sql
+
+
+--------------------------------------------------------------------------------
+--one-time fix to populate selector log with static selectors
+--------------------------------------------------------------------------------
+INSERT INTO ps_nvs_treeslctlog
+(selector_num, process_instance, length, num_rows, timestamp, module, action, client_info, status_flag, tree_name, ownerid, partition_name, job_no)
+SELECT DISTINCT selector_num, 0, length, 0, selector_dt, ' ', ' ', ' ', 'S', sys_context( 'userenv', 'current_schema' ), tree_name, ' ', 0
+FROM pstreeselctl c
+WHERE NOT EXISTS(SELECT 'x' FROM ps_nvs_treeslctlog l WHERE l.selector_Num = c.selector_num)
+/
+
+--------------------------------------------------------------------------------
+--one-time fix to set static selector flag 
+--------------------------------------------------------------------------------
+MERGE INTO ps_nvs_treeslctlog u
+USING (
+  SELECT c.selector_num, c.tree_name
+  FROM   ps_nvs_treeslctlog l
+  ,      pstreeselctl c
+  WHERE  c.selector_num = l.selector_num
+  AND    l.ownerid = sys_context( 'userenv', 'current_schema' )
+  AND    (l.tree_name = ' ' OR l.status_flag != 'S')
+) S
+ON (s.selector_num = u.selector_num)
+WHEN MATCHED THEN UPDATE
+SET u.tree_name = s.tree_name
+,   u.status_flag = 'S'
+/
+UPDATE ps_nvs_treeslctlog l
+SET    l.status_flag = 'D'
+WHERE  l.status_flag = 'S'
+AND    l.ownerid = sys_context( 'userenv', 'current_schema' )
+AND NOT EXISTS(
+	SELECT 'x'
+	FROM   pstreeselctl c
+	WHERE  c.selector_num = l.selector_num)
+/
+commit
+/
+
+
+--------------------------------------------------------------------------------
+--one-time fix to add partition name to selector log
+--------------------------------------------------------------------------------
+set serveroutput on 
+DECLARE
+  l_selector_num INTEGER;
+BEGIN
+  FOR i IN (
+    SELECT table_owner, table_name, partition_position, partition_name, high_value, high_value_length
+    FROM   all_tab_partitions p
+    WHERE  table_name LIKE 'PSTREESELECT__' 
+    ORDER BY table_name, partition_position desc
+  ) LOOP
+    l_selector_num := SUBSTR(i.high_value,1,i.high_value_length) - 1;
+    UPDATE ps_nvs_treeslctlog
+    SET    ownerid = i.table_owner
+    ,      partition_name = i.partition_name
+    WHERE  selector_num = l_selector_num
+    AND    partition_name = ' ';
+    dbms_output.put_line(i.table_owner||'.'||i.table_name||':'||l_selector_num||':'||i.partition_name);
+  END LOOP;
+END;
+/
+
+--------------------------------------------------------------------------------
+--one-time fix to clear non-existant partition names
+--------------------------------------------------------------------------------
+UPDATE ps_nvs_treeslctlog l
+SET    partition_name = ' '
+,      status_flag = 'X'
+WHERE  partition_name != ' '
+AND    NOT EXISTS (
+	SELECT 'x'
+	FROM 	dba_tab_partitions p
+	WHERE	p.partition_name = l.partition_name
+	AND     p.table_owner = l.ownerid
+	AND     p.table_name = 'PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00')))
+/
+
+
+--------------------------------------------------------------------------------
+--nvision set current schema 
+--------------------------------------------------------------------------------
+CREATE OR REPLACE TRIGGER sysadm.nvision_current_schema
+BEFORE UPDATE OF runstatus ON sysadm.psprcsrqst
+FOR EACH ROW
+WHEN (new.runstatus IN('7') AND new.prcsname = 'RPTBOOK' AND new.prcstype like 'nVision%')
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER SESSION SET current_schema = NVEXEC'||LTRIM(TO_CHAR(dbms_utility.get_hash_value(:new.prcsinstance,1,16),'00'));
+EXCEPTION WHEN OTHERS THEN NULL; --exception deliberately coded to suppress all exceptions
+END;
+/
+show errors
+pause
+
+
+
+
+/*-------------------------------------------------------------------------------------------------------------------------------------
+/*--Test script
+/*-------------------------------------------------------------------------------------------------------------------------------------
+set pages 99 lines 200 serveroutput on 
+column selector_num heading 'Selector|Number' format 999999 
+column table_name format a18
+column table_owner heading 'Table|Owner' format a8
+column ownerid heading 'Owner ID' format a8
+column partition_position heading 'Part|Pos' format 999
+column partition_name format a20
+column process_instance heading 'Process|Instance' format 99999999
+column length format 99
+column num_rows heading 'Num|Rows'
+column high_value format a20
+column client_info format a48
+column module format a12
+column timestamp format a28
+rollback;
+alter session set current_schema=NVEXEC01;
+exec dbms_application_info.set_module('TEST_MODULE','TEST_ACTION');
+delete from ps_nvs_treeslctlog where selector_num = 42;
+DELETE FROM PSTREESELECT10 WHERE SELECTOR_NUM=42;
+SELECT * FROM ps_nvs_treeslctlog WHERE SELECTOR_NUM=42;
+select * from user_tab_partitions where table_name = 'PSTREESELECT10' AND partition_position<4;
+commit;
+INSERT INTO PSTREESELECT10(SELECTOR_NUM,TREE_NODE_NUM,RANGE_FROM_10,RANGE_TO_10) 
+SELECT DISTINCT 42,L.TREE_NODE_NUM, SUBSTR(L.RANGE_FROM,1,10),SUBSTR(L.RANGE_TO,1,10) 
+FROM PSTREELEAF L WHERE L.SETID='GLOBE' AND L.SETCNTRLVALUE=' ' AND L.TREE_NAME='GAAP_ACCOUNT' AND L.EFFDT=TO_DATE('1901-01-01','YYYY-MM-DD')
+AND rownum <= 10;
+
+select sql_id, sql_text, module, action
+, substr(regexp_substr(s.SQL_TEXT,'SETID=\''[^'']+'),8) setid
+, substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+FROM   sys.v_$sql s
+where s.sql_text like 'INSERT%PSTREESELECT%SELECT DISTINCT %,%GAAP_ACCOUNT%'
+and rownum = 1
+/
+select DISTINCT sql_id, substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+, sql_text
+FROM   sys.v_$sql s
+WHERE  module = 'TEST_MODULE'
+AND    action = 'TEST_ACTION'
+and s.sql_text like 'INSERT INTO '||'PSTREESELECT10'||'%SELECT%'
+and s.sql_text like 'INSERT INTO '||'PSTREESELECT10'||'%SELECT% '||42||',%'
+/
+
+commit;
+select * from user_jobs where what like '%dbms_stats%';
+SELECT * FROM ps_nvs_treeslctlog WHERE SELECTOR_NUM=42;
+select owner, table_name, num_rows, last_analyzed
+from all_tables where table_name = 'PSTREESELECT10';
+select table_owner, table_name, partition_position, partition_name, high_value, num_rows, last_analyzed
+from all_tab_partitions where table_name = 'PSTREESELECT10';
+
+DELETE FROM PSTREESELECT10 WHERE SELECTOR_NUM=42;
+commit;
+select * from user_jobs where what like '%nvision_selectors%';
+SELECT * FROM ps_nvs_treeslctlog WHERE selector_num =42;
+
+column table_name format a18
+column partition_name format a12
+select table_name, partition_position, partition_name, num_rows, high_value
+from user_tab_partitions where table_name = 'PSTREESELECT10' 
+--AND partition_position<4
+;
+select selector_num, partition_name, timestamp from ps_nvs_treeslctlog where length = 10 and partition_name != ' ';
+delete from ps_nvs_treeslctlog where selector_num = 42;
+/*-------------------------------------------------------------------------------------------------------------------------------------*/
+
+
+
