@@ -131,13 +131,18 @@ BEGIN
     l_partition_name := p_partition_name;
   END IF;
 
+--1.12.2017 also purge any control record in case static to maintain integrity
+  l_cmd := 'DELETE FROM '||p_ownerid||'.pstreeselctl WHERE selector_num = :1'; 
+  debug_msg(l_cmd||','||p_selector_num);
+  EXECUTE IMMEDIATE l_cmd USING p_selector_num;
+
   IF l_partition_name IS NULL THEN
     l_cmd := 'DELETE FROM '||p_ownerid||'.'||l_table_name||' WHERE selector_num = :1'; 
     debug_msg(l_cmd||','||p_selector_num);
     EXECUTE IMMEDIATE l_cmd USING p_selector_num;
   ELSE
     BEGIN
---    l_cmd := 'SELECT COUNT(*) FROM '||l_table_name||' PARTITION('||l_partition_name||')'; 
+--    l_cmd := 'SELECT COUNT(*) FROM '||l_table_name||' PARTITION ('||l_partition_name||')'; 
 --    EXECUTE IMMEDIATE l_cmd INTO l_num_rows;
 --    debug_msg(l_cmd||':'||l_num_rows);
 
@@ -193,9 +198,11 @@ BEGIN
   FOR i IN (
     SELECT *
     FROM   ps_nvs_treeslctlog l
-    WHERE  l.process_instance = p_process_instance
-    OR    (    l.process_instance = 0
-           AND l.timestamp < SYSDATE-k_timeout_days)
+    WHERE (   l.process_instance = p_process_instance
+          OR  (   l.process_instance = 0
+              AND l.timestamp < SYSDATE-k_timeout_days)
+          )
+    AND   l.status_flag != 'S' /*dmk 1.12.2017 do not purge static selectors*/
   ) LOOP
     purge_selector(i.length, i.selector_num, i.ownerid, i.partition_name);
   END LOOP;
@@ -526,8 +533,10 @@ BEGIN
   dbms_application_info.read_module(l_module, l_action);
   dbms_application_info.set_module(NVL(l_module,k_module), NVL(l_action,'reset_selector_num'));
 
+  --reset selector sequence
   UPDATE pstreeselnum SET selector_num = 0;
 
+  --delete all tree selector control tables
   FOR i IN (
     SELECT owner, table_name
     FROM   all_tables
@@ -538,10 +547,12 @@ BEGIN
     debug_msg(TO_CHAR(SQL%ROWCOUNT)||' rows deleted from '||i.owner||'.'||i.table_name);
   END LOOP;
 
+  --mark all static selectors dynamic in log
   UPDATE ps_nvs_treeslctlog
   SET    status_flag = 'I'
   WHERE  status_flag = 'S';
 
+  --delete all selectors not in the log
   FOR i IN (
     SELECT owner, table_name
     ,      SUBSTR(table_name,-2) length
