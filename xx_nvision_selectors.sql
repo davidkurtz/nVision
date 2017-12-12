@@ -50,7 +50,7 @@ CREATE OR REPLACE PACKAGE BODY sysadm.xx_nvision_selectors AS
 k_module           CONSTANT VARCHAR2(64 CHAR) := $$PLSQL_UNIT; --name of package for instrumentation
 k_dfps             CONSTANT VARCHAR2(20 CHAR) := 'YYYYMMDDHH24MISS'; --date format picture string
 k_dfpsh            CONSTANT VARCHAR2(30 CHAR) := 'HH24:MI:SS DD.MM.YYYY'; --date format picture string for humans
-k_purge_days       CONSTANT INTEGER := 31; --number of days after which to purge selector log
+k_purge_days       CONSTANT INTEGER := 92; --number of days after which to purge selector log
 k_timeout_days     CONSTANT INTEGER := 2; --number of days after which nVision assumed to have terminated
 k_stats_gather_job CONSTANT BOOLEAN := TRUE; --true to always submit stats gather job, otherwise only on static selectors
 -------------------------------------------------------------------------------------------------------
@@ -149,7 +149,8 @@ BEGIN
       l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' DROP PARTITION '||l_partition_name||' UPDATE INDEXES';
       debug_msg(l_cmd);
       EXECUTE IMMEDIATE l_cmd;
-
+      l_cmd := '';
+    
       UPDATE ps_nvs_treeslctlog l
       SET    partition_name = ' '
       ,      status_flag = 'X'
@@ -181,6 +182,7 @@ BEGIN
     END;
   END IF;
   COMMIT;
+
 END purge_selector;
 
 --------------------------------------------------------------------------------
@@ -428,6 +430,11 @@ PROCEDURE purge
   l_module       VARCHAR2(64 CHAR);
   l_action       VARCHAR2(64 CHAR);
   l_client_info  VARCHAR2(64 CHAR);
+
+--l_deadlock       INTEGER := 0; --deadlock count
+--e_deadlock EXCEPTION;
+--PRAGMA EXCEPTION_INIT(e_deadlock, -2149); --ORA-00060: deadlock detected while waiting for resource
+
 BEGIN
   dbms_application_info.read_module(l_module, l_action);
   dbms_application_info.read_client_info(l_client_info);
@@ -481,6 +488,7 @@ BEGIN
     END;
 
   END LOOP;
+  COMMIT;
 
   --purge log entries where no process instance or older than timeout days
   FOR i IN (
@@ -497,12 +505,23 @@ BEGIN
     AND   (l.selector_num = p_selector_num OR p_selector_num IS NULL)
     ORDER BY l.selector_num
   ) LOOP 
-    purge_selector(i.length,i.selector_num,i.ownerid,i.partition_name);
+--  BEGIN
+      purge_selector(i.length,i.selector_num,i.ownerid,i.partition_name);
+--  EXCEPTION 
+--    WHEN e_deadlock THEN
+--      debug_msg('Deadlock detected:'||l_cmd);
+--      l_deadlock := l_deadlock + 1;
+--  END;
   END LOOP;
+--IF l_deadlock > 0 THEN
+--  debug_msg(TO_CHAR(l_deadlock)||' deadlock errors detected');
+--  RAISE e_deadlock;
+--END IF;
 
   DELETE FROM ps_nvs_treeslctlog
   WHERE  status_flag = 'X'
   AND    timestamp < TRUNC(SYSDATE-k_purge_days);
+  debug_msg(TO_CHAR(SQL%ROWCOUNT)||' tree selector log entries deleted');
 
   BEGIN
     FOR i IN(
