@@ -38,7 +38,6 @@ END xx_nvision_selectors;
 /
 
 
-
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --nvision selector population logging package body
@@ -708,7 +707,7 @@ BEGIN
         l_status_flag := 'I';
     END;
 
-    BEGIN
+    BEGIN 
       INSERT INTO ps_nvs_treeslctlog
       (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info
       , status_flag, tree_name, ownerid, partition_name, job_no)
@@ -716,13 +715,18 @@ BEGIN
       (g_selector_num, NVL(l_process_instance,0), p_length, g_counter, systimestamp, NVL(l_module,' '), NVL(l_action,' '), NVL(l_client_info,' ')
       , l_status_flag, l_tree_name, p_ownerid, NVL(l_partition_name,' '), 0);
     EXCEPTION
-      WHEN dup_val_on_index THEN
+      WHEN dup_val_on_index THEN --13.12.2017 add columns so all updated
         UPDATE ps_nvs_treeslctlog l
-        SET    l.num_rows = CASE WHEN l.status_flag IN ('D','X') THEN 0 ELSE l.num_rows END + g_counter
-        ,      l.status_flag = l_status_flag
+        SET    l.process_instance = NVL(l_process_instance,0)
+        ,      l.length = p_length
+        ,      l.num_rows = CASE WHEN l.status_flag IN ('D','X') THEN 0 
+                                 WHEN l.process_instance != l_process_instance THEN g_counter
+                                 ELSE l.num_rows END + g_counter
+        ,      l.timestamp = systimestamp
         ,      l.module = NVL(l_module,l.module)
         ,      l.appinfo_action = NVL(l_action,l.appinfo_action)
         ,      l.client_info = NVL(l_client_info,l.client_info)
+        ,      l.status_flag = l_status_flag
         ,      l.tree_name = l_tree_name
         ,      l.ownerid = p_ownerid
         ,      l.partition_name = l_partition_name
