@@ -2,6 +2,7 @@ REM xx_nvision_selectors.sql
 set echo on 
 spool xx_nvision_selectors
 rollback;
+ALTER SESSION SET current_schema=SYSADM;
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 --nvision selector population logging package

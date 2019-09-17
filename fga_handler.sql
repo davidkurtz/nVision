@@ -4,6 +4,7 @@ spool fga_handler
 
 REM requires psftapi 
 REM requires explicit select privs
+ALTER SESSION SET current_schema=SYSADM;
 GRANT SELECT ON sys.fga_log$ TO SYSADM;
 
 CREATE OR REPLACE PROCEDURE sysadm.aeg_fga_nvision_handler

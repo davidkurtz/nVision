@@ -2,6 +2,7 @@ REM nvision_dynamic_selectors.sql
 
 ROLLBACK;
 
+ALTER SESSION SET current_schema=SYSADM;
 GRANT SELECT on SYS.V_$SQL TO sysadm;
 
 set echo on pages 99 lines 180 trimspool on
@@ -131,8 +132,8 @@ BEGIN
     FROM   all_tables t
     WHERE  table_name LIKE 'PSTREESELECT__' 
   ) LOOP
-    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) SELECT DISTINCT s.selector_num, 0, '||i.length||', 0, SYSDATE, '' '', '' '', '' '', ''I'', '' '', '' '', '' '', 0 
-FROM '||i.owner||'.'||i.table_name||' s WHERE NOT EXISTS(SELECT 1 FROM ps_nvs_treeslctlog l WHERE l.selector_num = s.selector_num)';
+    l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) SELECT s.selector_num, 0, '||i.length||', COUNT(*), SYSDATE, '' '', '' '', '' '', ''I'', '' '', '''||i.owner||''', '' '', 0 
+FROM '||i.owner||'.'||i.table_name||' s WHERE NOT EXISTS(SELECT 1 FROM ps_nvs_treeslctlog l WHERE l.selector_num = s.selector_num) GROUP BY s.selector_num';
     dbms_output.put_line(l_sql);
     EXECUTE IMMEDIATE l_sql;
     dbms_output.put_line(SQL%ROWCOUNT||' rows inserted');
