@@ -1,6 +1,7 @@
 REM treeanal.sql
 Set lines 200 pages 999
 Break on report
+column process_instance format 9999999
 column partition_name format a20
 column timestamp format a28
 Column length format 99 heading 'Len'

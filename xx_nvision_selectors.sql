@@ -53,6 +53,7 @@ k_dfpsh            CONSTANT VARCHAR2(30 CHAR) := 'HH24:MI:SS DD.MM.YYYY'; --date
 k_purge_days       CONSTANT INTEGER := 92; --number of days after which to purge selector log
 k_timeout_days     CONSTANT INTEGER := 2; --number of days after which nVision assumed to have terminated
 k_stats_gather_job CONSTANT BOOLEAN := TRUE; --true to always submit stats gather job, otherwise only on static selectors
+k_lookup_tree_name CONSTANT BOOLEAN := TRUE; --enable lookup of tree name in v$sql, but can be expensive
 -------------------------------------------------------------------------------------------------------
 --package global variables
 -------------------------------------------------------------------------------------------------------
@@ -232,8 +233,7 @@ BEGIN
   debug_msg('set_selector_stats('||p_length||','||p_ownerid||'.'||p_partition_name||','||p_selector_num||','||p_num_rows||')');
   l_table_name     := 'PSTREESELECT'||LTRIM(TO_CHAR(p_length,'00'));
 
-  IF p_num_rows IS NOT NULL THEN
-    IF p_partition_name IS NOT NULL THEN
+  IF p_partition_name IS NOT NULL AND p_num_rows IS NOT NULL THEN
       debug_msg('set_table_stats('||p_ownerid||'.'||l_table_name||','||p_partition_name||','||p_num_rows||')',7);
       dbms_stats.set_table_stats(ownname=>p_ownerid
                                 ,tabname=>l_table_name
@@ -242,8 +242,6 @@ BEGIN
 		                ,numblks=>GREATEST(5,CEIL(p_num_rows/k_rowsperblock)) /*arbitary estimate*/
                                 ,avgrlen=>k_avgrowlen
                                 ,force=>TRUE);
-    END IF;
-  END IF;
 
   FOR i IN ( /*look for locally partitioned indexes on selector table*/
     SELECT index_name 
@@ -313,6 +311,7 @@ BEGIN
                              ,srec=>l_srec
                              ,avgclen=>p_length+1
                              ,force=>TRUE);
+  END IF;
 
 END set_selector_stats;
 --------------------------------------------------------------------------------
@@ -651,29 +650,31 @@ BEGIN
 
   debug_msg('logins:selector_num='||g_selector_num||' counter='||g_counter||',owner='||p_ownerid);
 
-  BEGIN --identify tree name to selector log
-    debug_msg('INSERT INTO '||l_table_name||'%SELECT% '||g_selector_num||',%');
-    SELECT DISTINCT 
---         substr(regexp_substr(s.SQL_TEXT,'SETID=\''[^'']+'),8) setid,
-           substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
-    INTO   --l_setid, 
-           l_tree_name
-    FROM   sys.v_$sql s
-    WHERE  s.sql_text like 'INSERT INTO '||l_table_name||'%SELECT DISTINCT '||g_selector_num||',%'
-    AND    s.module = l_module
-    AND    s.action = l_action
-    AND    s.parsing_schema_name = p_ownerid
---  AND    ROWNUM=1
+  IF k_lookup_tree_name THEN
+    BEGIN --identify tree name to selector log
+      debug_msg('INSERT INTO '||l_table_name||'%SELECT% '||g_selector_num||',%');
+      SELECT DISTINCT 
+--           substr(regexp_substr(s.SQL_TEXT,'SETID=\''[^'']+'),8) setid,
+             substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+      INTO   --l_setid, 
+             l_tree_name
+      FROM   sys.v_$sql s
+      WHERE  s.sql_text like 'INSERT INTO '||l_table_name||'%SELECT DISTINCT '||g_selector_num||',%'
+      AND    s.module = l_module
+      AND    s.action = l_action
+      AND    s.parsing_schema_name = p_ownerid
+--    AND    ROWNUM=1
     ;
-    debug_msg('Tree:'||l_tree_name);
-  EXCEPTION
-    WHEN too_many_rows THEN 
-      debug_msg('Too Many Trees:'||l_tree_name,3);
-      NULL;
-    WHEN no_data_found THEN 
-      debug_msg('No Tree Found',3);
-      l_tree_name := ' ';
-  END;
+      debug_msg('Tree:'||l_tree_name);
+    EXCEPTION
+      WHEN too_many_rows THEN 
+        debug_msg('Too Many Trees:'||l_tree_name,3);
+        NULL;
+      WHEN no_data_found THEN 
+        debug_msg('No Tree Found',3);
+        l_tree_name := ' ';
+    END;
+  END IF;
 
   --identify partition name
   debug_msg('Table '||p_ownerid||'.'||l_table_name||', selector '||g_selector_num||': Identify partition',8);
@@ -744,5 +745,6 @@ END logins;
 END xx_nvision_selectors;
 /
 show errors
+
+EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM');
 spool off
-pause

@@ -67,3 +67,5 @@ where table_name like 'PSTREESEL%'
 order by 1,2,3
 /
 
+EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM');
+

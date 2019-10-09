@@ -79,7 +79,10 @@ rem ORA-20000: AEG_FGA_NVISION_HANDER: No Audit Row
 rem ORA-06512: at "SYSADM.AEG_FGA_NVISION_HANDLER", line 28
 rem ORA-06512: at line 1
 exec aeg_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
+select * from ps_nvs_report where rownum <= 1;
+exec aeg_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
 rem but if not error it is because an audit has run in this session
+
 set serveroutput on 
 declare
   l_module VARCHAR2(64);
@@ -96,10 +99,19 @@ end;
  * The error handle is used to name the oracle trace file.  NB creates 0 length file even if trace not invoked
 /**********************************************************/
 BEGIN
+  DBMS_FGA.DROP_POLICY(
+   object_schema      => 'SYSADM',
+   object_name        => 'PS_NVS_REPORT',
+   policy_name        => 'PS_NVS_REPORT_SEL');
+END;
+/
+
+BEGIN
   DBMS_FGA.ADD_POLICY(
    object_schema      => 'SYSADM',
    object_name        => 'PS_NVS_REPORT',
    policy_name        => 'PS_NVS_REPORT_SEL',
+   handler_schema     => 'SYSADM',
    handler_module     => 'AEG_FGA_NVISION_HANDLER',
    enable             =>  TRUE,
    statement_types    => 'SELECT',

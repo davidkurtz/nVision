@@ -180,20 +180,27 @@ END;
 --------------------------------------------------------------------------------
 MERGE INTO ps_nvs_treeslctlog u
 USING (
-  SELECT DISTINCT l.selector_num, l.length
+  WITH x as (
+  SELECT l.selector_num, l.length
   ,      substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+  ,      s.last_active_time
   FROM   ps_nvs_treeslctlog l
   ,      v$sql s
-  where	 l.tree_name IS NULL
+  where  l.tree_name = ' '
   and	 l.module = s.module
   and	 l.appinfo_action = s.action
   and    s.sql_text like 'INSERT%PSTREESELECT%SELECT%'
-  and	 s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
-  and    l.tree_name = ' '
+  and    s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
+  and   (l.tree_name = ' ' OR l.timestamp IS NULL)
+  )
+  SELECT selector_num, length, tree_name, max(last_active_time) last_active_time
+  FROM   x
+  GROUP BY selector_Num, length, tree_name
 ) S
 ON (s.selector_num = u.selector_num)
 WHEN MATCHED THEN UPDATE
-SET u.tree_name = s.tree_name
+SET u.tree_name = s.tree_name   
+,   u.timestamp = s.last_active_time
 /
 
 MERGE INTO ps_nvs_treeslctlog u
@@ -436,11 +443,11 @@ select /*+MATERIALIZE*/ * from u
 select	l.selector_num, l.process_instance, l.length, l.timestamp, l.module, l.appinfo_action, l.client_info, l.status_flag, l.num_rows
 ,	NVL(l.tree_name, 
 	        (SELECT t.tree_name
-		from	t
-		where 	t.module = l.module
-		and	t.action = l.appinfo_action
-		and     t.selector_num = l.selector_num
-		and	rownum=1)
+		from  t
+		where t.module = l.module
+		and   t.action = l.appinfo_action
+		and   t.selector_num = l.selector_num
+		and   rownum=1)
 	) tree_name
 ,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,2),2) business_unit
 ,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,1),2) report_id
@@ -448,9 +455,9 @@ FROM	ps_nvs_treeslctlog l
 LEFT OUTER JOIN pstreeselctl s
 ON s.selector_num = l.selector_num
 )
-select 	l.*
-,	r.layout_id
-from	l
+select l.*
+,      r.layout_id
+from   l
 	left outer join ps_nvs_report r
 	on r.business_unit = l.business_unit
 	and r.report_id = l.report_id

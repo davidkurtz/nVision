@@ -1,6 +1,5 @@
 REM nvperfopts.sql
 REM (c)2013 David Kurtz
-REM 2017 modified for Chubb
 
 spool nvperfopts
 set pages 99 lines 200 trimspool on echo on
