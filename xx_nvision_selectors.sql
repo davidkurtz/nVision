@@ -30,6 +30,7 @@ PROCEDURE rowdel
 (p_selector_num     INTEGER 
 );
 PROCEDURE reset_selector_num;
+PROCEDURE update_tree_log;
 --exposed for testing only
 --PROCEDURE gather_selector_stats
 --(p_length INTEGER
@@ -66,7 +67,6 @@ g_range_from_min VARCHAR2(30 CHAR);
 g_range_from_max VARCHAR2(30 CHAR);
 g_range_to_min   VARCHAR2(30 CHAR);
 g_range_to_max   VARCHAR2(30 CHAR);
-
 -------------------------------------------------------------------------------------------------------
 -- to optionally print debug text during package run time
 -------------------------------------------------------------------------------------------------------
@@ -741,6 +741,38 @@ BEGIN
   END IF;
 --g_counter := 0;
 END logins;
+--------------------------------------------------------------------------------
+--update tree name in log
+--------------------------------------------------------------------------------
+PROCEDURE update_tree_log AS 
+BEGIN 
+
+MERGE INTO ps_nvs_treeslctlog u
+USING (
+  WITH x as (
+  SELECT l.selector_num, l.length
+  ,      substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+  ,      s.last_active_time
+  FROM   ps_nvs_treeslctlog l
+  ,      gv$sql s
+  where l.tree_name = ' '
+  and   l.module = s.module
+  and   l.appinfo_action = s.action
+  and   s.sql_text like 'INSERT%PSTREESELECT%SELECT%'
+  and   s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
+  and   (l.tree_name = ' ' OR l.timestamp IS NULL)
+  )
+  SELECT selector_num, length, tree_name, max(last_active_time) last_active_time
+  FROM   x
+  GROUP BY selector_Num, length, tree_name
+) S
+ON (s.selector_num = u.selector_num)
+WHEN MATCHED THEN UPDATE
+SET u.tree_name = s.tree_name
+,   u.timestamp = s.last_active_time;
+
+END update_tree_log;
+--------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 END xx_nvision_selectors;
 /
