@@ -7,7 +7,7 @@ REM requires explicit select privs
 ALTER SESSION SET current_schema=SYSADM;
 GRANT SELECT ON sys.fga_log$ TO SYSADM;
 
-CREATE OR REPLACE PROCEDURE sysadm.aeg_fga_nvision_handler
+CREATE OR REPLACE PROCEDURE sysadm.gfc_fga_nvision_handler
 (object_schema VARCHAR2
 ,object_name   VARCHAR2
 ,policy_name   VARCHAR2)
@@ -43,7 +43,7 @@ BEGIN
     AND    x.obj$name  = 'PS_NVS_REPORT';
   EXCEPTION
     WHEN no_data_found THEN
-      RAISE_APPLICATION_ERROR(-20000,'AEG_FGA_NVISION_HANDER: No Audit Row');
+      RAISE_APPLICATION_ERROR(-20000,'GFC_FGA_NVISION_HANDER: No Audit Row');
   END;
 
   IF l_parm4 IS NULL THEN
@@ -75,12 +75,12 @@ show errors
 /**********************************************************/
 rem this is a test - expected output
 rem ERROR at line 1:
-rem ORA-20000: AEG_FGA_NVISION_HANDER: No Audit Row
-rem ORA-06512: at "SYSADM.AEG_FGA_NVISION_HANDLER", line 28
+rem ORA-20000: GFC_FGA_NVISION_HANDER: No Audit Row
+rem ORA-06512: at "SYSADM.GFC_FGA_NVISION_HANDLER", line 28
 rem ORA-06512: at line 1
-exec aeg_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
+exec gfc_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
 select * from ps_nvs_report where rownum <= 1;
-exec aeg_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
+exec gfc_fga_nvision_handler('SYSADM','PS_NVS_REPORT','PS_NVS_REPORT_SEL');
 rem but if not error it is because an audit has run in this session
 
 set serveroutput on 
@@ -112,7 +112,7 @@ BEGIN
    object_name        => 'PS_NVS_REPORT',
    policy_name        => 'PS_NVS_REPORT_SEL',
    handler_schema     => 'SYSADM',
-   handler_module     => 'AEG_FGA_NVISION_HANDLER',
+   handler_module     => 'GFC_FGA_NVISION_HANDLER',
    enable             =>  TRUE,
    statement_types    => 'SELECT',
    audit_trail        =>  DBMS_FGA.DB + DBMS_FGA.EXTENDED);
