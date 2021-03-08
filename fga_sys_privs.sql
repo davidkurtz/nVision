@@ -3,6 +3,8 @@ REM fga_sys_privs.sql
 set echo on
 spool fga_sys_privs
 
+GRANT EXECUTE ON sys.dbms_fga TO SYSADM
+/
 GRANT SELECT ON sys.fga_log$ TO SYSADM
 /
 
