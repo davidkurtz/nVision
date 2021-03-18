@@ -226,6 +226,7 @@ WHEN MATCHED THEN UPDATE
 SET u.tree_name = s.tree_name
 /
 
+set serveroutput on
 DECLARE
   l_sql CLOB;
 BEGIN
@@ -233,25 +234,26 @@ BEGIN
   l_sql := 'MERGE INTO ps_nvs_treeslctlog u
 USING (
 WITH X AS (
-SELECT	l.selector_num, MIN(s.tree_node_num) tree_node_num
-FROM	ps_nvs_treeslctlog l
-,	pstreeselect'||i.length||' s
-WHERE	l.length = '||i.length||'
-AND	l.selector_num = s.selector_num
-AND	l.tree_name = '' ''
+SELECT  l.selector_num, MIN(s.tree_node_num) tree_node_num
+FROM    ps_nvs_treeslctlog l
+,       pstreeselect'||i.length||' s
+WHERE   l.length = '||i.length||'
+AND     l.selector_num = s.selector_num
+AND     l.tree_name = '' ''
 GROUP BY l.selector_num
 )
-SELECT DISTINCT x.selector_num, MAX(t.tree_name) tree_name
-FROM	x
-,	pstreenode t
-WHERE 	t.tree_node_num = x.tree_node_num
+SELECT  DISTINCT x.selector_num, MAX(t.tree_name) tree_name
+FROM    x
+,       pstreenode t
+WHERE   t.tree_node_num = x.tree_node_num
 GROUP BY x.selector_num
 HAVING COUNT(distinct tree_name)=1
 ORDER BY 1,2
 ) s 
 ON (s.selector_num = u.selector_num)
 WHEN MATCHED THEN UPDATE
-SET u.tree_name = s.treE_name';
+SET u.tree_name = s.tree_name';
+/*dbms_output.put_line(l_sql);*/
   execute immediate l_sql;
   END LOOP;
 END;
@@ -284,6 +286,33 @@ AND NOT EXISTS(
 	WHERE  c.selector_num = l.selector_num)
 /
 commit
+/
+
+--------------------------------------------------------------------------------
+--update number of rows on log from count of rows on corresponding treeselector table
+--------------------------------------------------------------------------------
+
+set serveroutput on
+DECLARE
+  l_num_rows INTEGER;
+  l_sql CLOB;
+BEGIN 
+  FOR i IN (
+    SELECT selector_num, length
+    FROM   ps_nvs_treeslctlog l
+    WHERE  num_rows = 0
+  ) LOOP
+    l_sql := 'SELECT COUNT(*) FROM PSTREESELECT'||LTRIM(TO_CHAR(i.length,'00'))||' WHERE selector_num = :1';
+    EXECUTE IMMEDIATE l_sql INTO l_num_rows USING i.selector_num;
+    dbms_output.put_line(l_sql||':'||l_num_rows);
+    IF l_num_rows > 0 THEN
+      UPDATE ps_nvs_treeslctlog l
+      SET    num_rows = l_num_rows
+      WHERE  selector_Num = i.selector_num
+      AND    length = i.length;
+    END IF;
+  END LOOP;
+END;
 /
 
 --------------------------------------------------------------------------------
@@ -346,7 +375,7 @@ END;
 /*--Test script
 /*-------------------------------------------------------------------------------------------------------------------------------------
 set pages 99 lines 200 serveroutput on 
-column selector_num heading 'Selector|Number' format 999999 
+column selector_num heading 'Selector|Number' format 9999999 
 column table_name format a18
 column ownerid heading 'Owner ID' format a8
 column partition_position heading 'Part|Pos' format 999
@@ -420,38 +449,38 @@ column module      format a12 heading 'Module'
 column action      format a26 heading 'Action'
 column appinfo_action  format a26 heading 'Action'
 column client_info format a50
-column selector_num format 999999 heading 'Selector|Number'
+column selector_num format 9999999 heading 'Selector|Number'
 column timestamp format a30
 with u as (
 	SELECT  s.module, s.action
-	, 	substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
-	, 	TO_NUMBER(substr(regexp_substr(s.SQL_TEXT,'DISTINCT ([[:digit:]])+'),10)) selector_num
-	from	v$sql s
-	where 	s.sql_text like 'INSERT%PSTREESELECT%SELECT%DISTINCT%'
-	union
-	select 	t.module, t.action
-	, 	CAST(substr(regexp_substr(x.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) AS VARCHAR2(30)) tree_name
-	, 	TO_NUMBER(substr(regexp_substr(x.SQL_TEXT,'DISTINCT ([[:digit:]])+'),10)) selector_num
-	from	dba_hist_sqltext x
-	,	dba_hist_sqlstat t
-	where	x.dbid = t.dbid
-	and	x.sql_id = t.sql_id
-	and	x.sql_text like 'INSERT%PSTREESELECT%SELECT%DISTINCT%'
+  ,       substr(regexp_substr(s.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) tree_name
+  ,       TO_NUMBER(substr(regexp_substr(s.SQL_TEXT,'DISTINCT ([[:digit:]])+'),10)) selector_num
+  from    v$sql s
+  where   s.sql_text like 'INSERT%PSTREESELECT%SELECT%DISTINCT%'
+  union
+  select  t.module, t.action
+  ,       CAST(substr(regexp_substr(x.SQL_TEXT,'TREE_NAME=\''[^'']+'),12) AS VARCHAR2(30)) tree_name
+  ,       TO_NUMBER(substr(regexp_substr(x.SQL_TEXT,'DISTINCT ([[:digit:]])+'),10)) selector_num
+  from    dba_hist_sqltext x
+  ,       dba_hist_sqlstat t
+  where   x.dbid = t.dbid
+  and     x.sql_id = t.sql_id
+  and     x.sql_text like 'INSERT%PSTREESELECT%SELECT%DISTINCT%'
 ), t as (
 select /*+MATERIALIZE*/ * from u
 ), l as (
-select	l.selector_num, l.process_instance, l.length, l.timestamp, l.module, l.appinfo_action, l.client_info, l.status_flag, l.num_rows
-,	NVL(l.tree_name, 
-	        (SELECT t.tree_name
-		from  t
-		where t.module = l.module
-		and   t.action = l.appinfo_action
-		and   t.selector_num = l.selector_num
-		and   rownum=1)
-	) tree_name
-,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,2),2) business_unit
-,	substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,1),2) report_id
-FROM	ps_nvs_treeslctlog l
+select  l.selector_num, l.process_instance, l.length, l.timestamp, l.module, l.appinfo_action, l.client_info, l.status_flag, l.num_rows
+,       NVL(l.tree_name, 
+             (SELECT t.tree_name
+              from   t
+   	          where t.module = l.module
+	          and   t.action = l.appinfo_action
+              and   t.selector_num = l.selector_num
+              and   rownum=1)
+        ) tree_name
+,       substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,2),2) business_unit
+,       substr(regexp_substr(l.appinfo_action,':([[:alnum:]])+',1,1),2) report_id
+FROM   ps_nvs_treeslctlog l
 LEFT OUTER JOIN pstreeselctl s
 ON s.selector_num = l.selector_num
 )
@@ -508,17 +537,17 @@ END;
 /*-------------------------------------------------------------------------------------
 ttitle 'Tree Structures'
 select  c.*
-,	s.tree_strct_id
-,	s.dtl_recname
-,	s.dtl_fieldname
-from	pstreeselctl c
-,	pstreedefn d
-,	pstreestrct s
-where	c.setid = d.setid
-and	c.setcntrlvalue = d.setcntrlvalue
-and	c.tree_name = d.tree_name
-and	c.effdt = d.effdt
-and	s.tree_strct_id = d.tree_strct_id
+,       s.tree_strct_id 
+,       s.dtl_recname 
+,       s.dtl_fieldname 
+from    pstreeselctl c 
+,       pstreedefn d 
+,       pstreestrct s 
+where   c.setid = d.setid 
+and     c.setcntrlvalue = d.setcntrlvalue 
+and     c.tree_name = d.tree_name 
+and     c.effdt = d.effdt 
+and     s.tree_strct_id = d.tree_strct_id 
 --and d.tree_name IN('INTNL_MCC_RPTG1','INTNL_MCC_RPTG2','INTNL_MCC_RPTG3','INTNL_MCC_RPTG4','GAAP_ACCOUNT','INTNL_GAAP_CONSOL','FUNCTION','MGMT_COMBO_CODE') 
 --and  s.dtl_fieldname IN('CHARTFIELD1','CHARTFIELD2','ACCOUNT')
 --and d.tree_strct_id IN('CONSOLIDATION')
@@ -569,17 +598,17 @@ END;
 set serveroutput on 
 BEGIN
   FOR i IN (
-select	c.*
-from	pstreeselctl c
-,	ps_nvs_treeslctlog l
-,	pstreedefn d
-where	c.setid = d.setid
-and	c.setcntrlvalue = d.setcntrlvalue
-and	c.tree_name = d.tree_name
-and	c.effdt = d.effdt
-and	l.selector_num = c.selector_num
-and	d.tree_name = l.tree_name
-and	d.tree_acc_selector = 'D'
+select  c.*
+from    pstreeselctl c
+,       ps_nvs_treeslctlog l
+,       pstreedefn d
+where   c.setid = d.setid
+and     c.setcntrlvalue = d.setcntrlvalue
+and     c.tree_name = d.tree_name
+and     c.effdt = d.effdt
+and     l.selector_num = c.selector_num
+and     d.tree_name = l.tree_name
+and     d.tree_acc_selector = 'D'
 order by c.selector_num
   ) LOOP
     UPDATE ps_nvs_treeslctlog 

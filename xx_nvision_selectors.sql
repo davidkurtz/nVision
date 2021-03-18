@@ -13,7 +13,8 @@ PROCEDURE logdel
 );
 PROCEDURE logins 
 (p_length           INTEGER
-,p_ownerid         VARCHAR2
+,p_ownerid          VARCHAR2
+,p_updstats         BOOLEAN DEFAULT TRUE
 );
 PROCEDURE purge_selectors
 (p_process_instance INTEGER 
@@ -627,8 +628,9 @@ END logdel;
 --insert entry into log table
 --------------------------------------------------------------------------------
 PROCEDURE logins 
-(p_length INTEGER
-,p_ownerid VARCHAR2
+(p_length   INTEGER
+,p_ownerid  VARCHAR2
+,p_updstats BOOLEAN DEFAULT TRUE
 ) AS 
   l_process_instance INTEGER;
   l_module           VARCHAR2(64 CHAR);
@@ -736,7 +738,9 @@ BEGIN
         RETURNING num_rows INTO g_counter; /*get new total count of rows*/
     END;
   
-    gather_selector_stats(p_length,g_selector_num,p_ownerid,g_counter,l_status_flag);
+    IF p_updstats THEN
+      gather_selector_stats(p_length,g_selector_num,p_ownerid,g_counter,l_status_flag);
+    END IF;
     g_selector_num := 0;
   END IF;
 --g_counter := 0;

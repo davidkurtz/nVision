@@ -6,6 +6,7 @@ spool treeselector_triggers
 --------------------------------------------------------------------------------
 DECLARE
   l_cmd CLOB;
+  l_updstats BOOLEAN := TRUE; /*TRUE=maintain tree selector statistic, FALSE=monitor only*/
 BEGIN
   FOR i IN (
     WITH x AS (
@@ -44,6 +45,7 @@ BEGIN
   sysadm.xx_nvision_selectors.'||i.logproc||'('||i.length;
   IF i.logproc = 'logins' THEN
     l_cmd := l_cmd||','''||i.owner||'''';
+    l_cmd := l_cmd||','||CASE WHEN l_updstats THEN 'TRUE' ELSE 'FALSE' END;
   END IF;
   l_cmd := l_cmd||');
 EXCEPTION WHEN OTHERS THEN 
@@ -69,3 +71,4 @@ order by 1,2,3
 
 EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM');
 
+spool off
