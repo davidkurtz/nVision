@@ -29,7 +29,7 @@ CREATE OR REPLACE TRIGGER psoft.gfc_nvision_excel_redirect_rqst
 BEFORE INSERT ON psoft.psprcsrqst
 FOR EACH ROW
 WHEN (new.prcstype IN('nVision-Report','nVision-ReportBook')
-AND   new.prcsname IN('RPTBOOK')
+AND   new.prcsname IN('RPTBOOK','NVSRUN')
      )
 DECLARE
   l_excel INTEGER := 0;  
@@ -37,6 +37,7 @@ DECLARE
 BEGIN
   $IF $$mydebug $THEN dbms_output.put_line('Entering Trigger psoft.gfc_nvision_excel_redirect_rqst'); $END
 
+  IF :new.prcstype = 'nVision-ReportBook' THEN
   SELECT 1
   INTO   l_excel
   FROM   psnvsbookrequst b
@@ -50,6 +51,18 @@ BEGIN
   AND    n.layout_id = e.layout_id
   AND    e.eff_status = 'A'
   AND    rownum=1;
+  ELSE
+    SELECT 1
+    INTO   l_excel
+    FROM   psprcsparms p
+    ,      ps_nvs_report n
+    ,      ps_nvs_redir_excel e
+    WHERE  p.prcsinstance = :new.prcsinstance
+    AND    n.report_id = substr(regexp_substr(p.parmlist,'-NRN[^ ]+'),5)
+    AND    n.layout_id = e.layout_id
+    AND    e.eff_status = 'A'
+    AND    rownum=1;
+  END IF;
 
   $IF $$mydebug $THEN dbms_output.put_line('found Excel nVision layout for oprid='||:new.oprid||', runcntlid='||:new.runcntlid); $END
   IF :new.prcsname IN('RPTBOOK') THEN
@@ -89,12 +102,14 @@ CREATE OR REPLACE TRIGGER psoft.gfc_nvision_excel_redirect_que
 BEFORE INSERT ON psoft.psprcsque
 FOR EACH ROW
 WHEN (new.prcstype IN('nVision-Report','nVision-ReportBook')
-AND   new.prcsname IN('RPTBOOK')
+AND   new.prcsname IN('RPTBOOK','NVSRUN')
      )
 DECLARE
   l_excel         INTEGER := 0;  
   l_maxconcurrent INTEGER := 0;
 BEGIN
+
+  IF :new.prcstype = 'nVision-ReportBook' THEN
   SELECT 1
   INTO   l_excel
   FROM   psnvsbookrequst b
@@ -108,8 +123,20 @@ BEGIN
   AND    n.layout_id = e.layout_id
   AND    e.eff_status = 'A'
   AND    rownum=1;
+  ELSE
+    SELECT 1
+    INTO   l_excel
+    FROM   psprcsparms p
+    ,      ps_nvs_report n
+    ,      ps_nvs_redir_excel e
+    WHERE  p.prcsinstance = :new.prcsinstance
+    AND    n.report_id = substr(regexp_substr(p.parmlist,'-NRN[^ ]+'),5)
+    AND    n.layout_id = e.layout_id
+    AND    e.eff_status = 'A'
+    AND    rownum=1;
+  END IF;
 
-  IF :new.prcsname IN('RPTBOOK') THEN
+  IF :new.prcsname IN('RPTBOOK','FBRPTBK') THEN
     :new.prcsname := 'RPTBOOKE';
   ELSE
     :new.prcsname := :new.prcsname||'E';
@@ -182,6 +209,36 @@ select prcsinstance, prcstype, prcsname, prcscategory, oprid, runcntlid
 from psprcsrqst
 where prcsinstance = 42;
 
+insert into psprcsque
+(PRCSINSTANCE, JOBINSTANCE, PRCSJOBSEQ, PRCSJOBNAME, MAINJOBINSTANCE, PRCSTYPE, PRCSNAME, MAINJOBNAME, MAINJOBSEQ, PRCSITEMLEVEL
+, RUNLOCATION, OPSYS, SERVERNAMERQST, SERVERNAMERUN, SERVERASSIGN, RUNDTTM, RECURNAME, OPRID, PRCSPRTY, SESSIONIDNUM, RUNSTATUS
+, RQSTDTTM, RECURDTTM, LASTUPDDTTM, RUNCNTLID, PRCSRTNCD, CONTINUEJOB, USERNOTIFIED, INITIATEDNEXT, OUTDESTTYPE, OUTDESTFORMAT
+, ORIGPRCSINSTANCE, GENPRCSTYPE, RESTARTENABLED, TIMEZONE, EMAIL_WEB_RPT, EMAIL_LOG_FLAG, PTEMAILRPTURLTYPE, PSRF_FOLDER_NAME
+, SCHEDULENAME, PRCSWINPOP, MCFREN_URL_ID, RETRYCOUNT, RECURORIGPRCSINST, P_PRCSINSTANCE, PRCSCATEGORY, PRCSCURREXPIREDTTM
+, DISTSTATUS, PRCSSTARTDTTM, RUNSERVEROPTION, TUXSVCID, PT_RETENTIONDAYS, PRCSRUNNOTIFY, PTNONUNPRCSID, QRYXFORMNAME
+, MSGNODENAME, CDM_APPROVAL_FLAG, PT_OVRDFROMEMAILID)
+WITH 
+o AS (select distinct dbname from ps.psdbowner
+), r as (
+SELECT b.oprid, b.run_cntl_id runcntlid
+FROM   PSNVSBOOKREQUST b
+,      PS_NVS_REPORT n
+WHERE  b.eff_status = 'A'
+and    n.business_unit = b.business_unit
+and    n.report_id = b.report_id
+and    n.layout_id IN('EXCELNVS')
+and    b.oprid = 'BATCH'
+)
+SELECT 42, 0, 0, ' ', 0, 'nVision-ReportBook', 'RPTBOOK', ' ', 0, 0
+, '2', '2', ' ', ' ', ' ', sysdate, ' ', r.OPRID, 5, 0, 5
+, sysdate, null, sysdate, r.RUNCNTLID, 0, 0, 0, 0, '6', '8'
+, 0, '7', '1', 'PST', ' ', ' ', 0, ' '
+, ' ', ' ', ' ', 0, 0, 0, 'nVisionOpenXML', null
+, ' ', null, '1', 0, 0, 0, ' ', ' '
+, ' ', ' ', ' '
+FROM o, r
+/
+
 select prcsinstance, prcstype, prcsname, prcscategory, oprid, runcntlid
 from psprcsque
 where prcsinstance = 42;
@@ -196,4 +253,8 @@ delete from psprcsrqst where prcsinstance = 42;
 delete from psprcsque where prcsinstance = 42;
 drop TRIGGER psoft.gfc_nvision_excel_redirect_rqst;
 drop TRIGGER psoft.gfc_nvision_excel_redirect_que;
+
+exec dbms_preprocessor.print_post_processed_source('TRIGGER',user,'GFC_NVISION_EXCEL_REDIRECT_QUE');
+exec dbms_preprocessor.print_post_processed_source('TRIGGER',user,'GFC_NVISION_EXCEL_REDIRECT_RQST');
+
 ****************************************************************************************************/
