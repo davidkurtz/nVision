@@ -38,19 +38,19 @@ BEGIN
   $IF $$mydebug $THEN dbms_output.put_line('Entering Trigger psoft.gfc_nvision_excel_redirect_rqst'); $END
 
   IF :new.prcstype = 'nVision-ReportBook' THEN
-  SELECT 1
-  INTO   l_excel
-  FROM   psnvsbookrequst b
-  ,      ps_nvs_report n
-  ,      ps_nvs_redir_excel e
-  WHERE  b.oprid = :new.oprid
-  AND    b.run_cntl_id = :new.runcntlid
-  AND    b.eff_status = 'A'
-  AND    n.business_unit = b.business_unit
-  AND    n.report_id = b.report_id
-  AND    n.layout_id = e.layout_id
-  AND    e.eff_status = 'A'
-  AND    rownum=1;
+    SELECT 1
+    INTO   l_excel
+    FROM   psnvsbookrequst b
+    ,      ps_nvs_report n
+    ,      ps_nvs_redir_excel e
+    WHERE  b.oprid = :new.oprid
+    AND    b.run_cntl_id = :new.runcntlid
+    AND    b.eff_status = 'A'
+    AND    n.business_unit = b.business_unit
+    AND    n.report_id = b.report_id
+    AND    n.layout_id = e.layout_id
+    AND    e.eff_status = 'A'
+    AND    rownum=1;
   ELSE
     SELECT 1
     INTO   l_excel
@@ -71,12 +71,14 @@ BEGIN
     :new.prcsname := :new.prcsname||'E';
   END IF;
 
+  --get category of new process definition
   SELECT d.prcscategory
   INTO   :new.prcscategory
   FROM   ps_prcsdefn d
   WHERE  d.prcstype = :new.prcstype
   AND    d.prcsname = :new.prcsname;
 
+  --get max concurrency of new category on new server
   SELECT maxconcurrent
   INTO   l_maxconcurrent
   FROM   ps_servercategory
@@ -110,19 +112,19 @@ DECLARE
 BEGIN
 
   IF :new.prcstype = 'nVision-ReportBook' THEN
-  SELECT 1
-  INTO   l_excel
-  FROM   psnvsbookrequst b
-  ,      ps_nvs_report n
-  ,      ps_nvs_redir_excel e
-  WHERE  b.oprid = :new.oprid
-  AND    b.run_cntl_id = :new.runcntlid
-  AND    b.eff_status = 'A'
-  AND    n.business_unit = b.business_unit
-  AND    n.report_id = b.report_id
-  AND    n.layout_id = e.layout_id
-  AND    e.eff_status = 'A'
-  AND    rownum=1;
+    SELECT 1
+    INTO   l_excel
+    FROM   psnvsbookrequst b
+    ,      ps_nvs_report n
+    ,      ps_nvs_redir_excel e
+    WHERE  b.oprid = :new.oprid
+    AND    b.run_cntl_id = :new.runcntlid
+    AND    b.eff_status = 'A'
+    AND    n.business_unit = b.business_unit
+    AND    n.report_id = b.report_id
+    AND    n.layout_id = e.layout_id
+    AND    e.eff_status = 'A'
+    AND    rownum=1;
   ELSE
     SELECT 1
     INTO   l_excel
@@ -136,7 +138,7 @@ BEGIN
     AND    rownum=1;
   END IF;
 
-  IF :new.prcsname IN('RPTBOOK','FBRPTBK') THEN
+  IF :new.prcsname IN('RPTBOOK') THEN
     :new.prcsname := 'RPTBOOKE';
   ELSE
     :new.prcsname := :new.prcsname||'E';
