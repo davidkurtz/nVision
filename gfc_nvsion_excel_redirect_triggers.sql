@@ -38,6 +38,7 @@ BEGIN
   $IF $$mydebug $THEN dbms_output.put_line('Entering Trigger psoft.gfc_nvision_excel_redirect_rqst'); $END
 
   IF :new.prcstype = 'nVision-ReportBook' THEN
+    --check for reportbook running report that uses layout on Excel list
     SELECT 1
     INTO   l_excel
     FROM   psnvsbookrequst b
@@ -52,6 +53,7 @@ BEGIN
     AND    e.eff_status = 'A'
     AND    rownum=1;
   ELSE
+    --look in command line for report running layout on Excel list
     SELECT 1
     INTO   l_excel
     FROM   psprcsparms p
@@ -64,6 +66,7 @@ BEGIN
     AND    rownum=1;
   END IF;
 
+  --update name of process if to be run on Excel
   $IF $$mydebug $THEN dbms_output.put_line('found Excel nVision layout for oprid='||:new.oprid||', runcntlid='||:new.runcntlid); $END
   IF :new.prcsname IN('RPTBOOK') THEN
     :new.prcsname := 'RPTBOOKE';
