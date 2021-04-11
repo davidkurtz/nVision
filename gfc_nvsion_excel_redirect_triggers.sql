@@ -9,24 +9,24 @@ rollback;
 ALTER SESSION SET PLSQL_CCFLAGS = 'mydebug:FALSE';
 
 ----------------------------------------------------------------------------------------------------
-CREATE TABLE psoft.ps_nvs_redir_excel
+CREATE TABLE sysadm.ps_nvs_redir_excel
 (layout_id VARCHAR2(50) NOT NULL
 ,eff_status VARCHAR2(1) not null
 );
 
-ALTER TABLE psoft.ps_nvs_redir_excel add eff_status VARCHAR2(1); 
-UPDATE psoft.ps_nvs_redir_excel SET eff_status = 'A';
-ALTER TABLE psoft.ps_nvs_redir_excel MODIFY eff_status not null;
+ALTER TABLE sysadm.ps_nvs_redir_excel add eff_status VARCHAR2(1); 
+UPDATE sysadm.ps_nvs_redir_excel SET eff_status = 'A';
+ALTER TABLE sysadm.ps_nvs_redir_excel MODIFY eff_status not null;
 
-CREATE UNIQUE INDEX psoft.ps_nvs_redir_excel ON psoft.ps_nvs_redir_excel (layout_id);
+CREATE UNIQUE INDEX sysadm.ps_nvs_redir_excel ON sysadm.ps_nvs_redir_excel (layout_id);
 ----------------------------------------------------------------------------------------------------
 REM load metadata of layouts that have to run on Excel rather than OpenXML
 @@gfc_nvsion_excel_redirect_metadata
 ----------------------------------------------------------------------------------------------------
 spool gfc_nvsion_excel_redirect_triggers app
 
-CREATE OR REPLACE TRIGGER psoft.gfc_nvision_excel_redirect_rqst 
-BEFORE INSERT ON psoft.psprcsrqst
+CREATE OR REPLACE TRIGGER sysadm.gfc_nvision_excel_redirect_rqst 
+BEFORE INSERT ON sysadm.psprcsrqst
 FOR EACH ROW
 WHEN (new.prcstype IN('nVision-Report','nVision-ReportBook')
 AND   new.prcsname IN('RPTBOOK','NVSRUN')
@@ -35,7 +35,7 @@ DECLARE
   l_excel INTEGER := 0;  
   l_maxconcurrent INTEGER := 0;
 BEGIN
-  $IF $$mydebug $THEN dbms_output.put_line('Entering Trigger psoft.gfc_nvision_excel_redirect_rqst'); $END
+  $IF $$mydebug $THEN dbms_output.put_line('Entering Trigger sysadm.gfc_nvision_excel_redirect_rqst'); $END
 
   IF :new.prcstype = 'nVision-ReportBook' THEN
     --check for reportbook running report that uses layout on Excel list
@@ -103,8 +103,8 @@ END;
 /
 show errors
 
-CREATE OR REPLACE TRIGGER psoft.gfc_nvision_excel_redirect_que
-BEFORE INSERT ON psoft.psprcsque
+CREATE OR REPLACE TRIGGER sysadm.gfc_nvision_excel_redirect_que
+BEFORE INSERT ON sysadm.psprcsque
 FOR EACH ROW
 WHEN (new.prcstype IN('nVision-Report','nVision-ReportBook')
 AND   new.prcsname IN('RPTBOOK','NVSRUN')
@@ -256,8 +256,8 @@ order by line;
 
 delete from psprcsrqst where prcsinstance = 42;
 delete from psprcsque where prcsinstance = 42;
-drop TRIGGER psoft.gfc_nvision_excel_redirect_rqst;
-drop TRIGGER psoft.gfc_nvision_excel_redirect_que;
+drop TRIGGER sysadm.gfc_nvision_excel_redirect_rqst;
+drop TRIGGER sysadm.gfc_nvision_excel_redirect_que;
 
 exec dbms_preprocessor.print_post_processed_source('TRIGGER',user,'GFC_NVISION_EXCEL_REDIRECT_QUE');
 exec dbms_preprocessor.print_post_processed_source('TRIGGER',user,'GFC_NVISION_EXCEL_REDIRECT_RQST');
