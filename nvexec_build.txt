@@ -19,7 +19,8 @@ create user nvexec16 identified by wibble42;
 
 ALTER USER sysadm   QUOTA UNLIMITED ON ptwork;
 ALTER USER sysadm   QUOTA UNLIMITED ON psindex;
-@@xx_nvision_selectors
+
+@@nvision_dynamic_selectors
 
 set serveroutput on
 DECLARE
