@@ -8,13 +8,11 @@ spool nvision_prcscategory
 break on prcsname skip 1
 set pages 99 lines 180 trimspool on
 
-select  p.prcsname, c.*
-from    ps_prcsdefn p
-,       ps_servercategory c
-where   p.prcstype like 'nVision-ReportBook' 
-and     p.prcsname IN('RPTBOOKE','RPTBOOK')
-and     c.prcscategory = p.prcscategory
-and     c.maxconcurrent>0
+select  c.*
+from    ps_servercategory c
+where   c.maxconcurrent>0
+and     servername like 'PSNT%'
+and     prcscategory like 'nVision%'
 order by 1,2
 /
 
