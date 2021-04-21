@@ -1,6 +1,6 @@
 REM gfc_nvsion_excel_redirect_triggers.sql
 REM (c)Go-Faster Consultancy 2021
-REM Triggers to switch process name from RPTBOOK to RPRBOOKE for reportbooks that have to be run on Excel
+REM Triggers to change process category to nVisionExcel for reports and reportbooks that have to be run on Excel
 
 REM see also https://blogs.oracle.com/oraclemagazine/on-conditional-compilatio
 set echo on
