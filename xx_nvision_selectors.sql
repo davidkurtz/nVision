@@ -666,7 +666,7 @@ BEGIN
       FROM   sys.v_$sql s
       WHERE  s.sql_text like 'INSERT INTO '||l_table_name||'%SELECT DISTINCT '||g_selector_num||',%'
       AND    s.module = l_module
-      AND    s.action = l_action
+      AND    (s.action = l_action OR (s.action is null and l_action is null))
       AND    s.parsing_schema_name = p_ownerid
 --    AND    ROWNUM=1
     ;
@@ -765,7 +765,7 @@ USING (
   ,      gv$sql s
   where l.tree_name = ' '
   and   l.module = s.module
-  and   l.appinfo_action = s.action
+  and   (l.appinfo_action = s.action OR (l.appinfo_action = ' ' AND s.action IS NULL))
   and   s.sql_text like 'INSERT%PSTREESELECT%SELECT%'
   and   s.sql_text like 'INSERT%PSTREESELECT'||LTRIM(TO_CHAR(l.length,'00'))||'%SELECT% '||l.selector_num||'%'
   and   (l.tree_name = ' ' OR l.timestamp IS NULL)
