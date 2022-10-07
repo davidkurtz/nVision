@@ -103,7 +103,7 @@ EXCEPTION
     RETURN(l_partition_name);
 END;
 --------------------------------------------------------------------------------
---drop partition in a selector table
+--truncate partition in a selector table
 --------------------------------------------------------------------------------
 PROCEDURE purge_selector
 (p_length         INTEGER
@@ -148,7 +148,10 @@ BEGIN
 --    EXECUTE IMMEDIATE l_cmd INTO l_num_rows;
 --    debug_msg(l_cmd||':'||l_num_rows);
 
-      l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' DROP PARTITION '||l_partition_name||' UPDATE INDEXES';
+      l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' TRUNCATE PARTITION '||l_partition_name||' UPDATE INDEXES DROP STORAGE';
+	  --cannot drop partitions because they do not get created again when the selector number recycles
+	  --l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' DROP PARTITION '||l_partition_name||' UPDATE INDEXES';
+	  
       debug_msg(l_cmd);
       EXECUTE IMMEDIATE l_cmd;
       l_cmd := '';
@@ -687,13 +690,14 @@ BEGIN
     AND    table_name = l_table_name
     ORDER BY table_name, partition_position desc
   ) LOOP
-    l_selector_num := SUBSTR(i.high_value,1,i.high_value_length) - 1; /*seletor high value-1*/
+    l_selector_num := SUBSTR(i.high_value,1,i.high_value_length) - 1; /*selector high value-1*/
     IF l_selector_num = g_selector_num THEN
       l_partition_name := i.partition_name;
       debug_msg('Partition:'||l_partition_name);
       EXIT;
     ELSIF l_selector_num < g_selector_num THEN
       debug_msg('No Partition identified');
+	  l_partition_name := ' '; /*added 6.10.2022*/
       EXIT;
     END IF;
   END LOOP;

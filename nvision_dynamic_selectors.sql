@@ -79,6 +79,7 @@ EXCEPTION WHEN OTHERS THEN NULL; --exception deliberately coded to suppress all 
 END;
 /
 show errors
+ALTER TRIGGER sysadm.xx_nvision_end DISABLE;
 pause
 --------------------------------------------------------------------------------
 --mark/unmark static selectors
@@ -131,12 +132,13 @@ BEGIN
     SELECT owner, table_name, SUBSTR(table_name,-2) length
     FROM   all_tables t
     WHERE  table_name LIKE 'PSTREESELECT__' 
+    AND    (owner = 'SYSADM' OR owner like 'NVEXEC%')
   ) LOOP
     l_sql := 'INSERT INTO ps_nvs_treeslctlog (selector_num, process_instance, length, num_rows, timestamp, module, appinfo_action, client_info, status_flag, tree_name, ownerid, partition_name, job_no) SELECT s.selector_num, 0, '||i.length||', COUNT(*), SYSDATE, '' '', '' '', '' '', ''I'', '' '', '''||i.owner||''', '' '', 0 
 FROM '||i.owner||'.'||i.table_name||' s WHERE NOT EXISTS(SELECT 1 FROM ps_nvs_treeslctlog l WHERE l.selector_num = s.selector_num) GROUP BY s.selector_num';
-    dbms_output.put_line(l_sql);
+    --dbms_output.put_line(l_sql);
     EXECUTE IMMEDIATE l_sql;
-    dbms_output.put_line(SQL%ROWCOUNT||' rows inserted');
+    dbms_output.put_line(i.owner||'.'||i.table_name||':'||SQL%ROWCOUNT||' rows inserted');
   END LOOP;
 END;
 /
@@ -160,6 +162,7 @@ BEGIN
     AND    t.partition_name = o.subobject_name
     AND    o.owner = t.table_owner
     AND    o.object_Type = 'TABLE PARTITION'
+    AND    (o.owner = 'SYSADM' OR o.owner like 'NVEXEC%')
   ) LOOP
     l_high_Value := i.high_Value;
     l_selector_Num := TO_NUMBER(l_high_value)-1;
@@ -298,11 +301,11 @@ DECLARE
   l_sql CLOB;
 BEGIN 
   FOR i IN (
-    SELECT selector_num, length
+    SELECT ownerid, selector_num, length
     FROM   ps_nvs_treeslctlog l
     WHERE  num_rows = 0
   ) LOOP
-    l_sql := 'SELECT COUNT(*) FROM PSTREESELECT'||LTRIM(TO_CHAR(i.length,'00'))||' WHERE selector_num = :1';
+    l_sql := 'SELECT COUNT(*) FROM '||i.ownerid||'.PSTREESELECT'||LTRIM(TO_CHAR(i.length,'00'))||' WHERE selector_num = :1';
     EXECUTE IMMEDIATE l_sql INTO l_num_rows USING i.selector_num;
     dbms_output.put_line(l_sql||':'||l_num_rows);
     IF l_num_rows > 0 THEN
@@ -326,6 +329,7 @@ BEGIN
     SELECT table_owner, table_name, partition_position, partition_name, high_value, high_value_length
     FROM   all_tab_partitions p
     WHERE  table_name LIKE 'PSTREESELECT__' 
+    AND    (table_owner = 'SYSADM' OR table_owner like 'NVEXEC%')
     ORDER BY table_name, partition_position desc
   ) LOOP
     l_selector_num := SUBSTR(i.high_value,1,i.high_value_length) - 1;

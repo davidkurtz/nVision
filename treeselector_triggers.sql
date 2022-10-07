@@ -1,5 +1,6 @@
 REM treeselector_triggers.sql
 set serveroutput on echo on
+clear screen
 spool treeselector_triggers
 --------------------------------------------------------------------------------
 --log selector population - dynamically create insert/delete triggers
@@ -25,9 +26,9 @@ BEGIN
     WHERE  r.recname = r.sqltablename
     AND    r.recname like 'PSTREESELECT__'
     AND    t.table_name = r.sqltablename
+    AND    (t.owner = 'SYSADM' or t.owner LIKE 'NVEXEC%')
   ) LOOP
-  l_cmd := 'CREATE OR REPLACE TRIGGER '||i.owner||'.'||LOWER(i.recname||'_'||i.action)||'
-FOR '||i.action||' ON '||i.owner||'.'||i.recname||' compound trigger
+  l_cmd := 'CREATE OR REPLACE TRIGGER '||i.owner||'.'||LOWER(i.recname||'_'||i.action)||' FOR '||i.action||' ON '||i.owner||'.'||i.recname||' compound trigger
   l_err_msg VARCHAR2(100 CHAR);
 AFTER EACH ROW IS 
 BEGIN
