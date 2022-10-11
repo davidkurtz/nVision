@@ -5,7 +5,7 @@ ROLLBACK;
 ALTER SESSION SET current_schema=SYSADM;
 GRANT SELECT on SYS.V_$SQL TO sysadm;
 
-set echo on pages 99 lines 180 trimspool on
+set echo on pages 99 lines 220 trimspool on
 spool nvision_dynamic_selectors
 --------------------------------------------------------------------------------
 --selector logging table
@@ -80,7 +80,7 @@ END;
 /
 show errors
 ALTER TRIGGER sysadm.xx_nvision_end DISABLE;
-pause
+--pause
 --------------------------------------------------------------------------------
 --mark/unmark static selectors
 --------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ END;
 /
 --DROP TRIGGER sysadm.xx_pstreeselctl_inc;
 show errors
-pause
+--pause
 
 --------------------------------------------------------------------------------
 --one-time fix to populate selector log with static selectors
@@ -124,7 +124,7 @@ COMMIT
 --------------------------------------------------------------------------------
 --one-time fix to populate selector log with contents of tree selector
 --------------------------------------------------------------------------------
-set serveroutput on
+set serveroutput on size unlimited
 DECLARE
   l_sql CLOB;
 BEGIN
@@ -321,7 +321,7 @@ END;
 --------------------------------------------------------------------------------
 --one-time fix to add partition name to selector log
 --------------------------------------------------------------------------------
-set serveroutput on 
+set serveroutput on size unlimited
 DECLARE
   l_selector_num INTEGER;
 BEGIN
@@ -374,23 +374,24 @@ END;
 
 @@treeselector_triggers
 
-
-/*-------------------------------------------------------------------------------------------------------------------------------------
-/*--Test script
-/*-------------------------------------------------------------------------------------------------------------------------------------
-set pages 99 lines 200 serveroutput on 
+spool nvision_dynamic_selectors append
+-------------------------------------------------------------------------------------------------------------------------------------
+--Test script
+-------------------------------------------------------------------------------------------------------------------------------------
+set pages 99 lines 220 serveroutput on 
 column selector_num heading 'Selector|Number' format 9999999 
 column table_name format a18
 column ownerid heading 'Owner ID' format a8
 column partition_position heading 'Part|Pos' format 999
-column partition_name format a20
+column partition_name heading 'Partition|Name' format a20
 column process_instance heading 'Process|Instance' format 99999999
-column length format 99
-column num_rows heading 'Num|Rows'
+column length heading 'Len' format 99
+column num_rows heading 'Number|of Rows' format 9999999
 column high_value format a20
 column client_info format a48
 column module format a12
 column timestamp format a28
+-------------------------------------------------------------------------------------------------------------------------------------
 rollback;
 exec dbms_application_info.set_module('TEST_MODULE','TEST_ACTION');
 delete from ps_nvs_treeslctlog where selector_num = 42;
@@ -443,9 +444,8 @@ delete from ps_nvs_treeslctlog where selector_num = 42;
 /*-------------------------------------------------------------------------------------------------------------------------------------*/
 
 ttitle 'Tree Selector Log'
-set pages 99 lines 200 termout off
+set pages 99 lines 220 termout off
 column business_unit format a5 heading 'Business|Unit'
-column process_instance heading 'Process|Instance'
 column tree_name   format a18
 column report_id   format a18
 column layout_id   format a18
@@ -499,7 +499,7 @@ order by selector_num
 TTITLE OFF
 set termout on
 
----------------------------------------------------------------------------------------
+/*---------------------------------------------------------------------------------------
 --drop extended stats from partitioned tree selectors
 ---------------------------------------------------------------------------------------*
 BEGIN

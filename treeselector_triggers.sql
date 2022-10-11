@@ -1,5 +1,5 @@
 REM treeselector_triggers.sql
-set serveroutput on echo on
+set serveroutput on size unlimited echo on 
 clear screen
 spool treeselector_triggers
 --------------------------------------------------------------------------------
@@ -54,7 +54,8 @@ EXCEPTION WHEN OTHERS THEN
   dbms_output.put_line(''Error:''||l_err_msg);
 END after statement;
 END;';
-    dbms_output.put_line(l_cmd);
+    --dbms_output.put_line(l_cmd);
+    dbms_output.put_line('TRIGGER '||i.owner||'.'||LOWER(i.recname||'_'||i.action));
     EXECUTE IMMEDIATE l_cmd;
   END LOOP;
 END;
@@ -70,6 +71,6 @@ where table_name like 'PSTREESEL%'
 order by 1,2,3
 /
 
-EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM');
+--EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM', compile_all=>FALSE);
 
 spool off

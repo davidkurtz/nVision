@@ -1,5 +1,5 @@
 REM xx_nvision_selectors.sql
-set echo on 
+set echo on timi on
 spool xx_nvision_selectors
 rollback;
 ALTER SESSION SET current_schema=SYSADM;
@@ -59,7 +59,7 @@ k_lookup_tree_name CONSTANT BOOLEAN := TRUE; --enable lookup of tree name in v$s
 -------------------------------------------------------------------------------------------------------
 --package global variables
 -------------------------------------------------------------------------------------------------------
-l_debug_level    INTEGER := 8;  -- variable to hold debug level of package
+l_debug_level    INTEGER := 5;  -- variable to hold debug level of package
 l_debug_indent   INTEGER := 0; -- indent level of procedure
 -------------------------------------------------------------------------------------------------------
 g_selector_num   INTEGER :=0;
@@ -135,12 +135,12 @@ BEGIN
 
 --1.12.2017 also purge any control record in case static to maintain integrity
   l_cmd := 'DELETE FROM '||p_ownerid||'.pstreeselctl WHERE selector_num = :1'; 
-  debug_msg(l_cmd||','||p_selector_num);
+  debug_msg(l_cmd||','||p_selector_num,6);
   EXECUTE IMMEDIATE l_cmd USING p_selector_num;
 
   IF l_partition_name IS NULL THEN
     l_cmd := 'DELETE FROM '||p_ownerid||'.'||l_table_name||' WHERE selector_num = :1'; 
-    debug_msg(l_cmd||','||p_selector_num);
+    debug_msg(l_cmd||','||p_selector_num,6);
     EXECUTE IMMEDIATE l_cmd USING p_selector_num;
   ELSE
     BEGIN
@@ -148,17 +148,16 @@ BEGIN
 --    EXECUTE IMMEDIATE l_cmd INTO l_num_rows;
 --    debug_msg(l_cmd||':'||l_num_rows);
 
-      l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' TRUNCATE PARTITION '||l_partition_name||' UPDATE INDEXES DROP STORAGE';
+      l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' TRUNCATE PARTITION '||l_partition_name||' DROP STORAGE UPDATE INDEXES';
 	  --cannot drop partitions because they do not get created again when the selector number recycles
 	  --l_cmd := 'ALTER TABLE '||p_ownerid||'.'||l_table_name||' DROP PARTITION '||l_partition_name||' UPDATE INDEXES';
 	  
-      debug_msg(l_cmd);
+      debug_msg(l_cmd,6);
       EXECUTE IMMEDIATE l_cmd;
       l_cmd := '';
     
       UPDATE ps_nvs_treeslctlog l
-      SET    partition_name = ' '
-      ,      status_flag = 'X'
+      SET    status_flag = 'X'
       WHERE  selector_num = p_selector_num
       AND    partition_name = l_partition_name
       RETURNING job_no INTO l_job_no;
@@ -461,6 +460,7 @@ BEGIN
       ,      p.high_value, p.high_value_length
       FROM   all_tab_partitions p
       WHERE  p.table_name LIKE 'PSTREESELECT__'
+      AND    (p.table_owner = 'SYSADM' OR p.table_owner LIKE 'NVEXEC%')
     )
     SELECT x.*
     FROM   x
@@ -563,6 +563,7 @@ BEGIN
     SELECT owner, table_name
     FROM   all_tables
     WHERE  table_name = 'PSTREESELCTL'
+    AND    (owner = 'SYSADM' OR owner like 'NVEXEC%')
   ) LOOP
     l_sql := 'DELETE FROM '||i.owner||'.'||i.table_name;
     EXECUTE IMMEDIATE l_sql;
@@ -580,6 +581,7 @@ BEGIN
     ,      SUBSTR(table_name,-2) length
     FROM   all_part_tables
     WHERE  table_name LIKE 'PSTREESELECT__'
+    AND    (owner = 'SYSADM' OR owner like 'NVEXEC%')
   ) LOOP
     l_sql := 'DELETE FROM '||i.owner||'.'||i.table_name
           ||' WHERE NOT selector_num IN(SELECT selector_num FROM ps_nvs_treeslctlog l WHERE l.ownerid='''||i.owner||''' AND l.length='||i.length||' AND status_flag=''I'')';
@@ -786,5 +788,15 @@ END xx_nvision_selectors;
 /
 show errors
 
-EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM');
+BEGIN
+  FOR i IN (
+    SELECT username
+    FROM   dba_users
+    WHERE  (username = 'SYSADM' OR username LIKE 'NVEXEC%')
+  ) LOOP
+    dbms_output.put_line('Compiling:'||i.username);
+    DBMS_UTILITY.compile_schema(schema => i.username, compile_all=>FALSE);
+  END LOOP;
+END;
+/
 spool off

@@ -19,7 +19,7 @@ begin
                               ,'FOR ALL COLUMNS SIZE AUTO FOR COLUMNS SIZE 254 SELECTOR_NUM TREE_NODE_NUM FOR COLUMNS SIZE 1 RANGE_FROM_'||i.length||
                                ' RANGE_TO_'||i.length||' (SELECTOR_NUM, TREE_NODE_NUM) (SELECTOR_NUM, RANGE_FROM_'||i.length||') (SELECTOR_NUM, RANGE_TO_'||i.length||')'
                               );
-    dbms_stats.gather_table_stats(i.owner,i.table_name);
+    --dbms_stats.gather_table_stats(i.owner,i.table_name);
   END LOOP;
 end;
 /
