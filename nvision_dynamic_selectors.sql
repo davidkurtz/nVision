@@ -382,16 +382,17 @@ set pages 99 lines 220 serveroutput on
 column selector_num heading 'Selector|Number' format 9999999 
 column table_name format a18
 column ownerid heading 'Owner ID' format a8
-column partition_position heading 'Part|Pos' format 999
-column partition_name heading 'Partition|Name' format a20
-column process_instance heading 'Process|Instance' format 99999999
-column length heading 'Len' format 99
-column num_rows heading 'Number|of Rows' format 9999999
-column high_value format a20
+column partition_position format 999 heading 'Part|Pos' 
+column partition_name format a20 heading 'Partition|Name' 
+column process_instance format 99999999 heading 'Process|Instance' 
+column length      format 99 heading 'Len' 
+column num_rows    format 9999999 heading 'Number|of Rows' 
+column high_value  format a20
 column client_info format a48
-column module format a12
-column timestamp format a28
--------------------------------------------------------------------------------------------------------------------------------------
+column module      format a20 heading 'Module'
+column action      format a26 heading 'Action'
+column timestamp   format a28
+/*-------------------------------------------------------------------------------------------------------------------------------------
 rollback;
 exec dbms_application_info.set_module('TEST_MODULE','TEST_ACTION');
 delete from ps_nvs_treeslctlog where selector_num = 42;
@@ -449,8 +450,6 @@ column business_unit format a5 heading 'Business|Unit'
 column tree_name   format a18
 column report_id   format a18
 column layout_id   format a18
-column module      format a12 heading 'Module'
-column action      format a26 heading 'Action'
 column appinfo_action  format a26 heading 'Action'
 column client_info format a50
 column selector_num format 9999999 heading 'Selector|Number'

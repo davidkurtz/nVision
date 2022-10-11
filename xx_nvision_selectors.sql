@@ -613,9 +613,9 @@ BEGIN
 
   l_process_instance := psftapi.get_prcsinstance();
 
-  debug_msg('logdel:selector_num='||g_selector_num);
-
   IF g_selector_num > 0 THEN
+    debug_msg('logdel:selector_num='||g_selector_num);
+
     UPDATE ps_nvs_treeslctlog
     SET    status_flag = 'D'
 /*  ,      num_rows = 0 --retain num rows on log*/
