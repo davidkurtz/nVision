@@ -85,7 +85,7 @@ END debug_msg;
 FUNCTION get_partition_name(p_selector_num INTEGER) RETURN VARCHAR2 IS
   l_partition_name all_tab_partitions.partition_name%TYPE := '';
 BEGIN
-  debug_msg('get_partition_name('||p_selector_num||')');
+  debug_msg('get_partition_name('||p_selector_num||')',6);
   SELECT p.partition_name
   INTO   l_partition_name
   FROM   ps_nvs_treeslctlog l
@@ -174,7 +174,7 @@ BEGIN
 
     EXCEPTION 
       WHEN e_partition_does_not_exist THEN
-        debug_msg('Partition does not exist.  Marking as deleted in log'); 
+        debug_msg('Selector '||p_selector_num||', Partition '||l_partition_name||' does not exist.  Marking as deleted in log'); 
         UPDATE ps_nvs_treeslctlog l
         SET    partition_name = ' '
         ,      status_flag = 'X'

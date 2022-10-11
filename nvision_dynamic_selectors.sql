@@ -127,6 +127,7 @@ COMMIT
 set serveroutput on size unlimited
 DECLARE
   l_sql CLOB;
+  l_rowcount INTEGER;
 BEGIN
   FOR i IN (
     SELECT owner, table_name, SUBSTR(table_name,-2) length
@@ -138,7 +139,10 @@ BEGIN
 FROM '||i.owner||'.'||i.table_name||' s WHERE NOT EXISTS(SELECT 1 FROM ps_nvs_treeslctlog l WHERE l.selector_num = s.selector_num) GROUP BY s.selector_num';
     --dbms_output.put_line(l_sql);
     EXECUTE IMMEDIATE l_sql;
-    dbms_output.put_line(i.owner||'.'||i.table_name||':'||SQL%ROWCOUNT||' rows inserted');
+    l_rowcount := SQL%ROWCOUNT;
+    IF l_rowcount>0 THEN
+      dbms_output.put_line(i.owner||'.'||i.table_name||':'||l_rowcount||' rows inserted');
+    END IF;
   END LOOP;
 END;
 /
@@ -307,8 +311,8 @@ BEGIN
   ) LOOP
     l_sql := 'SELECT COUNT(*) FROM '||i.ownerid||'.PSTREESELECT'||LTRIM(TO_CHAR(i.length,'00'))||' WHERE selector_num = :1';
     EXECUTE IMMEDIATE l_sql INTO l_num_rows USING i.selector_num;
-    dbms_output.put_line(l_sql||':'||l_num_rows);
     IF l_num_rows > 0 THEN
+      dbms_output.put_line(l_sql||':'||l_num_rows);
       UPDATE ps_nvs_treeslctlog l
       SET    num_rows = l_num_rows
       WHERE  selector_Num = i.selector_num
@@ -338,7 +342,10 @@ BEGIN
     ,      partition_name = i.partition_name
     WHERE  selector_num = l_selector_num
     AND    partition_name = ' ';
-    dbms_output.put_line(i.table_owner||'.'||i.table_name||':'||l_selector_num||':'||i.partition_name);
+    
+    IF l_selector_num > 1 THEN
+      dbms_output.put_line(i.table_owner||'.'||i.table_name||':'||l_selector_num||':'||i.partition_name);
+    END IF;
   END LOOP;
 END;
 /
