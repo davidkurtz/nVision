@@ -56,9 +56,9 @@ alter table ps_nvs_treeslctlog modify job_no not null;
 alter table ps_nvs_treeslctlog rename column action to appinfo_action;
 
 
-CREATE UNIQUE INDEX ps_nvs_treeslctlog ON ps_nvs_treeslctlog (selector_num) TABLESPACE psindex
+CREATE UNIQUE INDEX ps_nvs_treeslctlog ON ps_nvs_treeslctlog (ownerid, selector_num) TABLESPACE psindex
 /
-CREATE INDEX psanvs_treeslctlog ON ps_nvs_treeslctlog (process_instance, selector_num) TABLESPACE psindex
+CREATE INDEX psanvs_treeslctlog ON ps_nvs_treeslctlog (process_instance, ownerid, selector_num) TABLESPACE psindex
 /
 CREATE INDEX psbnvs_treeslctlog ON ps_nvs_treeslctlog (length, partition_name) TABLESPACE psindex
 /
@@ -370,6 +370,7 @@ BEGIN
     WHERE  r.prcsinstance = l.process_instance
     and	   r.runstatus IN('2','9')
     and	   l.partition_name != ' '
+    and    NOT l.status_flag IN('X','S') 
   ) LOOP
     dbms_output.put_line('Purging PI:'||i.process_instance);
     xx_nvision_selectors.purge_selectors(i.process_instance);

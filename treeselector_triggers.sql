@@ -1,5 +1,5 @@
 REM treeselector_triggers.sql
-set serveroutput on size unlimited echo on 
+set serveroutput on size unlimited echo on pages 999
 clear screen
 spool treeselector_triggers
 --------------------------------------------------------------------------------
@@ -27,6 +27,7 @@ BEGIN
     AND    r.recname like 'PSTREESELECT__'
     AND    t.table_name = r.sqltablename
     AND    (t.owner = 'SYSADM' or t.owner LIKE 'NVEXEC%')
+    ORDER BY owner, recname
   ) LOOP
   l_cmd := 'CREATE OR REPLACE TRIGGER '||i.owner||'.'||LOWER(i.recname||'_'||i.action)||' FOR '||i.action||' ON '||i.owner||'.'||i.recname||' compound trigger
   l_err_msg VARCHAR2(100 CHAR);
@@ -43,9 +44,8 @@ EXCEPTION WHEN OTHERS THEN NULL;
 END after each row;
 AFTER STATEMENT IS
 BEGIN
-  sysadm.xx_nvision_selectors.'||i.logproc||'('||i.length;
+  sysadm.xx_nvision_selectors.'||i.logproc||'('||i.length||','''||i.owner||''''; /*22.2.23 pass owner id to logins and logdel*/
   IF i.logproc = 'logins' THEN
-    l_cmd := l_cmd||','''||i.owner||'''';
     l_cmd := l_cmd||','||CASE WHEN l_updstats THEN 'TRUE' ELSE 'FALSE' END;
   END IF;
   l_cmd := l_cmd||');
@@ -54,8 +54,8 @@ EXCEPTION WHEN OTHERS THEN
   dbms_output.put_line(''Error:''||l_err_msg);
 END after statement;
 END;';
+    dbms_output.put_line('TRIGGER:'||i.owner||'.'||i.recname||'_'||i.action);
     --dbms_output.put_line(l_cmd);
-    dbms_output.put_line('TRIGGER '||i.owner||'.'||LOWER(i.recname||'_'||i.action));
     EXECUTE IMMEDIATE l_cmd;
   END LOOP;
 END;
@@ -69,6 +69,16 @@ select owner, table_name, trigger_name, status
 from all_Triggers
 where table_name like 'PSTREESEL%'
 order by 1,2,3
+/
+
+spool treeselector_triggers append
+set long 50000
+column ddl format a200
+select dbms_metadata.get_ddl('TRIGGER',trigger_name,owner) ddl
+from all_triggers
+where table_name like 'PSTREESELECT__'
+order by owner, table_name, trigger_name
+fetch first 10 rows only
 /
 
 --EXEC DBMS_UTILITY.compile_schema(schema => 'SYSADM', compile_all=>FALSE);

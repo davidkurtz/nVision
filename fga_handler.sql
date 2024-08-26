@@ -118,5 +118,6 @@ BEGIN
    audit_trail        =>  DBMS_FGA.DB + DBMS_FGA.EXTENDED);
 END;
 /
+select * from dba_audit_policies;
 /**********************************************************/
 spool off

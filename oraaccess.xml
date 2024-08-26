@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ASCII" ?> 
+<!--    oraaccess.xml dmk 25.4.2023
+        enable OCI prefetch of 100 rows to reduce round trips between client and server.
+        see https://docs.oracle.com/en/database/oracle/oracle-database/21/lnoci/build-and-configure-oci-applications.html#GUID-6C76054A-0E0A-4783-B00D-9B65C80C24B0
+        Puit oraaccess.xml file in directory specified by the TNS_ADMIN environment variable, or if not set in $ORACLE_HOME/network/admin directory.
+     --> 
+ <oraaccess xmlns="http://xmlns.oracle.com/oci/oraaccess"
+  xmlns:oci="http://xmlns.oracle.com/oci/oraaccess"
+  schemaLocation="http://xmlns.oracle.com/oci/oraaccess
+  http://xmlns.oracle.com/oci/oraaccess.xsd">
+  <default_parameters>
+    <prefetch>
+      <rows>100</rows> 
+    </prefetch>
+  </default_parameters>
+</oraaccess>
