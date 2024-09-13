@@ -44,32 +44,26 @@ BEGIN
 END tsdiff;
 a as (
 SELECT /*+MATERIALIZE*/ o.dbname, c.retention
---, p.prcstype, p.prcsname, p.oprid, p.runcntlid, p.parmvalue
-from dba_hist_wr_control c, ps.psdbowner o --, PS_PRCS_SESS_PARM p
-where c.con_id = 0
-and o.ownerid = 'SYSADM'
---and p.param_name = 'cursor_sharing'
---and p.prcsname = 'RPTBOOK'
+from dba_hist_wr_control c, ps.psdbowner o
+where c.con_id = 0 and o.ownerid = 'SYSADM'
 fetch first 1 rows only
 ), x as (
 select /*+LEADING(A R X)*/ r.oprid, r.runcntlid, r.prcsinstance, r.runstatus, p.parmvalue
---, force_matching_signature
---, min(sample_time) min_sample_time
---, max(sample_time) max_sample_time
---, (CAST(r.enddttm AS DATE)-CAST(r.begindttm AS DATE))*86400 elap_secs
-, tsdiff(MIN(r.begindttm),MAX(r.enddttm)) elap_secs
-, sum(h.usecs_per_row)/1e6 ash_Secs
-,	SUM(DECODE(event,'resmgr:cpu quantum',h.usecs_per_row))/1e6 resmgr_secs
-,	SUM(DECODE(in_parse,'Y',h.usecs_per_row))/1e6 parse_secs
-,	SUM(DECODE(event,null,h.usecs_per_row))/1e6 cpu_secs
-, count(distinct h.sql_id) sql_ids
-,	count(distinct h.force_matching_signature) fms
-, count(*) num_samples
+,      tsdiff(MIN(r.begindttm),MAX(r.enddttm)) elap_secs
+,      sum(h.usecs_per_row)/1e6 ash_Secs
+,	   SUM(DECODE(event,'resmgr:cpu quantum',h.usecs_per_row))/1e6 resmgr_secs
+,	   SUM(DECODE(in_parse,'Y',h.usecs_per_row))/1e6 parse_secs
+,	   SUM(DECODE(event,null,h.usecs_per_row))/1e6 cpu_secs
+,      count(distinct h.sql_id) sql_ids
+,	   count(distinct h.force_matching_signature) fms
+,      count(*) num_samples
 from a
- inner join psprcsrqst r on a.dbname = r.dbname AND r.prcstype = 'nVision-ReportBook' AND r.prcsname = 'RPTBOOK'
-   and r.runstatus != '8'
- inner join dba_hist_Snapshot x ON x.end_interval_time >= r.begindttm and x.begin_interval_time <= NVL(r.enddttm,SYSDATE) 
- inner join dba_hist_Active_Sess_history h on h.dbid = x.dbid and h.instance_number = x.instance_number and h.snap_id = x.snap_id
+ inner join psprcsrqst r 
+   on a.dbname = r.dbname AND r.prcstype = 'nVision-ReportBook' AND r.prcsname = 'RPTBOOK' and r.runstatus != '8'
+ inner join dba_hist_Snapshot x 
+   ON x.end_interval_time >= r.begindttm and x.begin_interval_time <= NVL(r.enddttm,SYSDATE) 
+ inner join dba_hist_Active_Sess_history h 
+   on h.dbid = x.dbid and h.instance_number = x.instance_number and h.snap_id = x.snap_id
  left outer join PS_PRCS_SESS_PARM p
    on p.param_name = 'cursor_sharing' and p.prcstype = r.prcstype AND p.prcsname = r.prcsname AND p.runcntlid = r.runcntlid and p.oprid = r.oprid    
 where r.dbname = a.dbname
@@ -78,29 +72,19 @@ and r.begindttm >= SYSDATE-a.retention
 and h.action like 'PI='||r.prcsinstance||':%'
 and h.sample_time BETWEEN r.begindttm and NVL(r.enddttm,SYSDATE)
 group by r.prcstype, r.prcsname, r.oprid, r.runcntlid, r.prcsinstance, r.runstatus, p.parmvalue
---, action
---, force_matching_signature
---, top_level_sql_id
---having count(*)>1
 ), y as (
-select CASE WHEN sql_ids>fms THEN 'EXACT' ELSE 'FORCE' END as cursor_sharing
-, x.*
+select x.*
+, CASE WHEN sql_ids>fms THEN 'EXACT' ELSE 'FORCE' END as cursor_sharing
 from x
 )
 select oprid, runcntlid, cursor_sharing, parmvalue
 , count(prcsinstance) num_prcs
-, avg(elap_secs) avg_elap_secs
-, stddev(elap_secs) stddev_elap_secs
-, avg(ash_secs) avg_ash_secs
-, stddev(ash_secs) stddev_ash_secs
-, avg(resmgr_secs) avg_resmgr_secs
-, stddev(resmgr_secs) stddev_resmgr_secs
-, avg(parse_secs) avg_parse_secs
-, stddev(parse_secs) stddev_parse_secs
-, avg(cpu_secs) avg_cpu_secs
-, stddev(cpu_secs) stddev_cpu_secs
-, avg(sql_ids) avg_sql_ids
-, avg(fms) avg_fms
+, avg(elap_secs) avg_elap_secs    , stddev(elap_secs) stddev_elap_secs
+, avg(ash_secs) avg_ash_secs      , stddev(ash_secs) stddev_ash_secs
+, avg(resmgr_secs) avg_resmgr_secs, stddev(resmgr_secs) stddev_resmgr_secs
+, avg(parse_secs) avg_parse_secs  , stddev(parse_secs) stddev_parse_secs
+, avg(cpu_secs) avg_cpu_secs      , stddev(cpu_secs) stddev_cpu_secs
+, avg(sql_ids) avg_sql_ids        , avg(fms) avg_fms
 from y
 group by oprid, runcntlid, cursor_sharing, parmvalue
 order by 1,2
