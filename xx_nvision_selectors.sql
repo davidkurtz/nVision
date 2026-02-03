@@ -1,4 +1,5 @@
 REM xx_nvision_selectors.sql
+REM https://blog.psftdba.com/2017/11/nvision-performance-tuning-6-logging.html
 set echo on timi on serveroutput on
 spool xx_nvision_selectors
 rollback;

@@ -1,4 +1,6 @@
 REM pstreeselctl.sql
+REM https://blog.psftdba.com/2017/11/nvision-performance-tuning-6-logging.html
+
 spool pstreeselctl append
 
 CREATE TABLE &&1..PSTREESELCTL (SETID VARCHAR2(5) NOT NULL,
